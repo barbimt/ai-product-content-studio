@@ -257,6 +257,13 @@ export function ProductContentWorkflow() {
     }
   }
 
+  function handleGenerateAnother() {
+    if (submission.status !== "tracking") return;
+    const product = submission.run.product;
+    if (!product.productName.trim()) return;
+    void handleSubmit(product);
+  }
+
   const steps = getWorkflowStepsForState(toWorkflowPhase(submission));
   const run = submission.status === "tracking" ? submission.run : null;
 
@@ -317,7 +324,7 @@ export function ProductContentWorkflow() {
             <>
               <Alert>
                 <CircleCheck />
-                <AlertTitle>Draft ready — approve in Orchestra</AlertTitle>
+                <AlertTitle>Description ready</AlertTitle>
                 <AlertDescription>
                   {workflowMessages.awaitingApproval}
                 </AlertDescription>
@@ -325,22 +332,32 @@ export function ProductContentWorkflow() {
               {run.draft ? (
                 <GeneratedDraft draft={run.draft} review={run.review} />
               ) : null}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleGenerateAnother}
+                  disabled={submission.status === "submitting"}
+                >
+                  {workflowMessages.generateAnother}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefresh}
+                  disabled={
+                    submission.status === "tracking" && submission.refreshing
+                  }
+                >
+                  {submission.status === "tracking" && submission.refreshing
+                    ? "Checking..."
+                    : "Refresh status"}
+                </Button>
+              </div>
               {run.approvalUrl ? (
                 <ApprovalActions approvalUrl={run.approvalUrl} />
               ) : null}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                disabled={
-                  submission.status === "tracking" && submission.refreshing
-                }
-              >
-                {submission.status === "tracking" && submission.refreshing
-                  ? "Checking..."
-                  : "I decided in Orchestra — refresh"}
-              </Button>
             </>
           ) : null}
 
@@ -354,6 +371,14 @@ export function ProductContentWorkflow() {
               {run.draft ? (
                 <GeneratedDraft draft={run.draft} review={run.review} />
               ) : null}
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleGenerateAnother}
+                disabled={submission.status === "submitting"}
+              >
+                {workflowMessages.generateAnother}
+              </Button>
             </>
           ) : null}
 
@@ -367,6 +392,14 @@ export function ProductContentWorkflow() {
               {run.draft ? (
                 <GeneratedDraft draft={run.draft} review={run.review} />
               ) : null}
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleGenerateAnother}
+                disabled={submission.status === "submitting"}
+              >
+                {workflowMessages.generateAnother}
+              </Button>
             </>
           ) : null}
 

@@ -17,8 +17,8 @@ export function ApprovalActions({ approvalUrl }: { approvalUrl: string }) {
         {workflowMessages.openInOrchestra}
       </a>
       <p className="text-xs text-muted-foreground">
-        Open the run in Orchestra to Approve or Reject. This page updates when
-        that decision is recorded.
+        Optional: record Approve or Reject in Orchestra. Or generate another
+        version below if you want a different draft.
       </p>
     </div>
   );

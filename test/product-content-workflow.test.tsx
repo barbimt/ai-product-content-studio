@@ -69,9 +69,12 @@ describe("ProductContentWorkflow", () => {
     await user.click(screen.getByRole("button", { name: /generate description/i }));
 
     expect(
-      await screen.findByText(/draft ready — approve in orchestra/i),
+      await screen.findByText(/description ready/i),
     ).toBeInTheDocument();
     expect(screen.getByText("A clear product description.")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /generate another/i }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /approve in orchestra/i }),
     ).toHaveAttribute(
@@ -144,9 +147,7 @@ describe("ProductContentWorkflow", () => {
 
     await user.click(screen.getByRole("button", { name: /check status/i }));
 
-    expect(
-      await screen.findByText(/draft ready — approve in orchestra/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/description ready/i)).toBeInTheDocument();
 
     resolveWait?.(
       new Response(
@@ -168,9 +169,7 @@ describe("ProductContentWorkflow", () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/draft ready — approve in orchestra/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/description ready/i)).toBeInTheDocument();
     });
     expect(screen.getByText("Ready draft from status.")).toBeInTheDocument();
   });
