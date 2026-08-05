@@ -324,6 +324,7 @@ export function ProductContentWorkflow() {
   }
 
   const run = submission.status === "tracking" ? submission.run : null;
+  const showingHistory = selectedHistory !== null;
 
   function readyDraftSection(draft: string, review: RunView["review"]) {
     if (showVersionCompare && previousDraft) {
@@ -378,7 +379,6 @@ export function ProductContentWorkflow() {
           <DescriptionHistory
             items={history}
             selectedRunId={selectedHistory?.runId ?? null}
-            selectedItem={selectedHistory}
             loading={historyLoading}
             error={historyError}
             onSelect={handleSelectHistory}
@@ -403,7 +403,28 @@ export function ProductContentWorkflow() {
         ) : null}
 
         <div aria-live="polite" className="space-y-4">
-          {run?.phase === "generating" ? (
+          {showingHistory && selectedHistory ? (
+            <>
+              <p className="text-xs text-muted-foreground">
+                {workflowMessages.historySelected}
+              </p>
+              {selectedHistory.draft ? (
+                <GeneratedDraft
+                  title={selectedHistory.product.productName}
+                  draft={selectedHistory.draft}
+                  review={selectedHistory.review}
+                  productName={selectedHistory.product.productName}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Draft not ready yet for this run.
+                </p>
+              )}
+              <ProductSubmissionSummary product={selectedHistory.product} />
+            </>
+          ) : null}
+
+          {!showingHistory && run?.phase === "generating" ? (
             <>
               <Alert>
                 <Loader2 className="animate-spin" />
@@ -431,7 +452,7 @@ export function ProductContentWorkflow() {
             </>
           ) : null}
 
-          {run && isReadyPhase(run.phase) ? (
+          {!showingHistory && run && isReadyPhase(run.phase) ? (
             <>
               <Alert>
                 <CircleCheck />
@@ -444,7 +465,7 @@ export function ProductContentWorkflow() {
             </>
           ) : null}
 
-          {run?.phase === "rejected" ? (
+          {!showingHistory && run?.phase === "rejected" ? (
             <>
               <Alert variant="destructive">
                 <XCircle />
@@ -455,7 +476,7 @@ export function ProductContentWorkflow() {
             </>
           ) : null}
 
-          {run?.phase === "failed" ? (
+          {!showingHistory && run?.phase === "failed" ? (
             <Alert variant="destructive">
               <TriangleAlert />
               <AlertTitle>Generation failed</AlertTitle>
@@ -464,9 +485,13 @@ export function ProductContentWorkflow() {
           ) : null}
         </div>
 
-        {submission.status === "idle" && !run ? <EmptyWorkflowState /> : null}
+        {!showingHistory && submission.status === "idle" && !run ? (
+          <EmptyWorkflowState />
+        ) : null}
 
-        {run ? <ProductSubmissionSummary product={run.product} /> : null}
+        {!showingHistory && run ? (
+          <ProductSubmissionSummary product={run.product} />
+        ) : null}
       </section>
     </div>
   );

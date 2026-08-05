@@ -12,7 +12,7 @@ version, and reopen recent runs from history.
 - Wait for Orchestra to generate and review the description
 - Copy or download the draft as `.txt`
 - Submit the form again for another version (optional previous vs new compare)
-- Open **History** to pick a past run; the full draft opens under the list
+- Open **History** to pick a past run; the full draft opens in the right panel
 
 ## How it works
 
