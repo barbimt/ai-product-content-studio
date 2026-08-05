@@ -6,24 +6,18 @@ import { CircleCheck, Loader2, TriangleAlert, XCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ProductDescriptionForm } from "./product-description-form";
-import { WorkflowStatus } from "./workflow-status";
 import { EmptyWorkflowState } from "./empty-workflow-state";
 import { RequestErrorAlert } from "./request-error-alert";
 import { ProductSubmissionSummary } from "./product-submission-summary";
 import { GeneratedDraft } from "./generated-draft";
 import { DraftExportActions } from "./draft-export-actions";
 import { DraftVersionCompare } from "./draft-version-compare";
-import { ApprovalActions } from "./approval-actions";
 import {
   GENERATE_ENDPOINT,
   runStatusEndpoint,
   runWaitEndpoint,
   workflowMessages,
 } from "@/lib/messages";
-import {
-  getWorkflowStepsForState,
-  type WorkflowPhase,
-} from "@/lib/workflow/status";
 import type { ProductDescriptionInput } from "@/lib/validation/product-description";
 import type {
   GenerateResponseBody,
@@ -42,24 +36,6 @@ type SubmissionState =
       statusError: string | null;
       refreshing: boolean;
     };
-
-function toWorkflowPhase(state: SubmissionState): WorkflowPhase {
-  if (state.status === "idle") return "idle";
-  if (state.status === "submitting") return "submitting";
-  if (state.status === "submit_error") return "submit_error";
-  switch (state.run.phase) {
-    case "generating":
-      return "generating";
-    case "awaiting_approval":
-      return "awaiting_approval";
-    case "approved":
-      return "approved";
-    case "rejected":
-      return "rejected";
-    case "failed":
-      return "run_failed";
-  }
-}
 
 const phaseRank: Record<RunView["phase"], number> = {
   generating: 0,
@@ -89,6 +65,10 @@ function mergeRunView(previous: RunView, next: RunView): RunView {
   };
 }
 
+function isReadyPhase(phase: RunView["phase"]): boolean {
+  return phase === "awaiting_approval" || phase === "approved";
+}
+
 export function ProductContentWorkflow() {
   const [submission, setSubmission] = useState<SubmissionState>({
     status: "idle",
@@ -99,7 +79,6 @@ export function ProductContentWorkflow() {
     submission.status === "tracking" ? submission.runId : null;
   const trackingPhase =
     submission.status === "tracking" ? submission.run.phase : null;
-  const awaitingApproval = trackingPhase === "awaiting_approval";
   const currentDraft =
     submission.status === "tracking" ? submission.run.draft : null;
   const showVersionCompare = Boolean(
@@ -107,8 +86,7 @@ export function ProductContentWorkflow() {
       currentDraft &&
       previousDraft !== currentDraft &&
       trackingPhase &&
-      trackingPhase !== "generating" &&
-      trackingPhase !== "failed",
+      isReadyPhase(trackingPhase),
   );
 
   async function applyStatus(runId: string): Promise<void> {
@@ -139,7 +117,6 @@ export function ProductContentWorkflow() {
     });
   }
 
-  // One long request while Orchestra generates — no client polling loop.
   useEffect(() => {
     if (!trackingRunId || trackingPhase !== "generating") return;
 
@@ -174,7 +151,6 @@ export function ProductContentWorkflow() {
           };
         });
 
-        // Hobby /wait may time out while Orchestra is still running — refresh once.
         if (body.phase === "generating") {
           await applyStatus(trackingRunId!);
         }
@@ -196,20 +172,6 @@ export function ProductContentWorkflow() {
       controller.abort();
     };
   }, [trackingRunId, trackingPhase]);
-
-  // When the user comes back from Orchestra, refresh once — not on a timer.
-  useEffect(() => {
-    if (!trackingRunId || !awaitingApproval) return;
-
-    function onVisible() {
-      if (document.visibilityState === "visible") {
-        void applyStatus(trackingRunId!);
-      }
-    }
-
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [trackingRunId, awaitingApproval]);
 
   async function handleSubmit(
     values: ProductDescriptionInput,
@@ -288,15 +250,7 @@ export function ProductContentWorkflow() {
     void handleSubmit(product, { preservePreviousDraft: true });
   }
 
-  function draftBlock(draft: string, review: RunView["review"]) {
-    return (
-      <GeneratedDraft
-        draft={draft}
-        review={review}
-        productName={run?.product.productName ?? "product"}
-      />
-    );
-  }
+  const run = submission.status === "tracking" ? submission.run : null;
 
   function readyDraftSection(draft: string, review: RunView["review"]) {
     if (showVersionCompare && previousDraft) {
@@ -319,11 +273,15 @@ export function ProductContentWorkflow() {
         </>
       );
     }
-    return draftBlock(draft, review);
-  }
 
-  const steps = getWorkflowStepsForState(toWorkflowPhase(submission));
-  const run = submission.status === "tracking" ? submission.run : null;
+    return (
+      <GeneratedDraft
+        draft={draft}
+        review={review}
+        productName={run?.product.productName ?? "product"}
+      />
+    );
+  }
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-12">
@@ -337,9 +295,9 @@ export function ProductContentWorkflow() {
         />
       </section>
 
-      <section aria-labelledby="workflow-heading" className="space-y-4">
-        <h2 id="workflow-heading" className="text-sm font-semibold">
-          Workflow status
+      <section aria-labelledby="result-heading" className="space-y-4">
+        <h2 id="result-heading" className="text-sm font-semibold">
+          Generated description
         </h2>
 
         {submission.status === "submit_error" ? (
@@ -358,7 +316,7 @@ export function ProductContentWorkflow() {
             <>
               <Alert>
                 <Loader2 className="animate-spin" />
-                <AlertTitle>Generating in Orchestra</AlertTitle>
+                <AlertTitle>Generating</AlertTitle>
                 <AlertDescription>{workflowMessages.generating}</AlertDescription>
               </Alert>
               {previousDraft ? (
@@ -370,7 +328,13 @@ export function ProductContentWorkflow() {
                   showExport={false}
                 />
               ) : null}
-              {run.draft ? draftBlock(run.draft, run.review) : null}
+              {run.draft ? (
+                <GeneratedDraft
+                  draft={run.draft}
+                  review={run.review}
+                  productName={run.product.productName}
+                />
+              ) : null}
               <Button
                 type="button"
                 variant="outline"
@@ -385,51 +349,14 @@ export function ProductContentWorkflow() {
             </>
           ) : null}
 
-          {run?.phase === "awaiting_approval" ? (
+          {run && isReadyPhase(run.phase) ? (
             <>
               <Alert>
                 <CircleCheck />
                 <AlertTitle>Description ready</AlertTitle>
                 <AlertDescription>
-                  {workflowMessages.awaitingApproval}
+                  {workflowMessages.descriptionReady}
                 </AlertDescription>
-              </Alert>
-              {run.draft ? readyDraftSection(run.draft, run.review) : null}
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleGenerateAnother}
-                  disabled={submission.status === "submitting"}
-                >
-                  {workflowMessages.generateAnother}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefresh}
-                  disabled={
-                    submission.status === "tracking" && submission.refreshing
-                  }
-                >
-                  {submission.status === "tracking" && submission.refreshing
-                    ? "Checking..."
-                    : "Refresh status"}
-                </Button>
-              </div>
-              {run.approvalUrl ? (
-                <ApprovalActions approvalUrl={run.approvalUrl} />
-              ) : null}
-            </>
-          ) : null}
-
-          {run?.phase === "approved" ? (
-            <>
-              <Alert>
-                <CircleCheck />
-                <AlertTitle>Approved</AlertTitle>
-                <AlertDescription>{workflowMessages.approved}</AlertDescription>
               </Alert>
               {run.draft ? readyDraftSection(run.draft, run.review) : null}
               <Button
@@ -447,7 +374,7 @@ export function ProductContentWorkflow() {
             <>
               <Alert variant="destructive">
                 <XCircle />
-                <AlertTitle>Rejected</AlertTitle>
+                <AlertTitle>Needs another pass</AlertTitle>
                 <AlertDescription>{workflowMessages.rejected}</AlertDescription>
               </Alert>
               {run.draft ? readyDraftSection(run.draft, run.review) : null}
@@ -465,13 +392,11 @@ export function ProductContentWorkflow() {
           {run?.phase === "failed" ? (
             <Alert variant="destructive">
               <TriangleAlert />
-              <AlertTitle>Workflow failed</AlertTitle>
+              <AlertTitle>Generation failed</AlertTitle>
               <AlertDescription>{workflowMessages.runFailed}</AlertDescription>
             </Alert>
           ) : null}
         </div>
-
-        <WorkflowStatus steps={steps} />
 
         {submission.status === "idle" ? <EmptyWorkflowState /> : null}
 

@@ -23,6 +23,6 @@ describe("ProductDescriptionForm", () => {
 
     const button = screen.getByRole("button", { name: /generate description/i });
     expect(button).toBeDisabled();
-    expect(screen.getByRole("status")).toHaveTextContent(/starting workflow/i);
+    expect(screen.getByRole("status")).toHaveTextContent(/starting generation/i);
   });
 });

@@ -28,7 +28,7 @@ describe("ProductContentWorkflow", () => {
   it("shows the empty state before submission", () => {
     render(<ProductContentWorkflow />);
     expect(
-      screen.getByText(/submit a product to start an orchestra workflow/i),
+      screen.getByText(/submit a product to generate a description/i),
     ).toBeInTheDocument();
   });
 
@@ -80,11 +80,8 @@ describe("ProductContentWorkflow", () => {
       screen.getByRole("button", { name: /download \.txt/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /approve in orchestra/i }),
-    ).toHaveAttribute(
-      "href",
-      "https://app.getorchestra.io/pipeline-runs/run-42/lineage",
-    );
+      screen.queryByRole("link", { name: /approve in orchestra/i }),
+    ).not.toBeInTheDocument();
 
     await waitFor(() => {
       const urls = vi.mocked(globalThis.fetch).mock.calls.map((call) => String(call[0]));

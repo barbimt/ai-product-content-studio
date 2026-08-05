@@ -1,8 +1,7 @@
 # Product Content Studio
 
 Next.js app that starts an Orchestra pipeline to draft ecommerce product
-descriptions, shows the draft in the UI, and sends people to Orchestra for the
-final Approve / Reject.
+descriptions, then lets you copy, download, or generate another version.
 
 ## How it works
 
@@ -13,8 +12,7 @@ flowchart LR
     C --> D[Generate]
     D --> E[Review]
     E --> F[Notify callback]
-    F --> G[Approve or request details in Orchestra]
-    F --> H[UI shows draft]
+    F --> G[UI shows draft]
 ```
 
 1. The form posts product name, category, features, and tone.
@@ -22,14 +20,7 @@ flowchart LR
 3. The browser makes **one** wait request (`/api/orchestra/runs/{runId}/wait`).
 4. Orchestra runs **Generate → Review → Notify Product Content Studio**.
 5. Notify `POST`s draft + review to `/api/orchestra/callback` (shared secret).
-6. The wait request ends; the UI shows the draft and a link to Approve in Orchestra.
-7. After the human decision, refresh status (tab focus or button). That part still
-   uses Orchestra’s Metadata API.
-
-Pipeline branches after Notify:
-
-- review `APPROVE` → Final content approval
-- review `REVIEW` → Request additional product details
+6. The UI shows the draft with Copy, Download `.txt`, and Generate another.
 
 ## Stack
 
@@ -37,7 +28,7 @@ Pipeline branches after Notify:
 - Tailwind CSS v4, shadcn/ui
 - React Hook Form + Zod
 - Vitest
-- Orchestra (webhook start, HTTP callback, Metadata API for later status)
+- Orchestra (webhook start, HTTP callback, Metadata API for status)
 
 No database and no login. Run data lives in memory on the server process.
 
@@ -56,19 +47,17 @@ Open [http://localhost:3000](http://localhost:3000).
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `ORCHESTRA_WEBHOOK_URL` | yes | Pipeline start URL from Orchestra |
-| `ORCHESTRA_API_TOKEN` | yes* | Bearer token for Orchestra Metadata API |
+| `ORCHESTRA_API_TOKEN` | yes | Bearer token for Orchestra Metadata API |
 | `ORCHESTRA_CALLBACK_SECRET` | yes | Shared secret for the Notify HTTP header |
 | `ORCHESTRA_REQUEST_TIMEOUT_MS` | no | Outbound Orchestra timeout (default `15000`) |
 | `ORCHESTRA_API_BASE_URL` | no | Defaults to `https://app.getorchestra.io/api/engine/public` |
 | `ORCHESTRA_UI_BASE_URL` | no | Defaults to `https://app.getorchestra.io` |
 
-\*Needed to refresh Approve / Reject status after the human decision.
-
 ## Orchestra setup
 
 Expected pipeline shape:
 
-`Generate → Review → Notify Product Content Studio → (Final approval | Request details)`
+`Generate → Review → Notify Product Content Studio`
 
 Notify HTTP task:
 
@@ -128,8 +117,8 @@ Path stays `/api/orchestra/callback`.
 |--------|------|------|
 | `POST` | `/api/orchestra/generate` | Validate form, start pipeline, remember run |
 | `POST` | `/api/orchestra/callback` | Receive draft + review from Orchestra Notify |
-| `GET` | `/api/orchestra/runs/[runId]/wait` | Wait until callback (or timeout ~110s) |
-| `GET` | `/api/orchestra/runs/[runId]` | Current run view (draft + approval phase) |
+| `GET` | `/api/orchestra/runs/[runId]/wait` | Wait until draft is ready (or timeout ~110s) |
+| `GET` | `/api/orchestra/runs/[runId]` | Current run view (draft + status) |
 
 Secrets never go to the browser. The UI only talks to these routes.
 

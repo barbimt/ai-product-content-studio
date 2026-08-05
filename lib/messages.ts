@@ -9,17 +9,15 @@ export function runWaitEndpoint(runId: string): string {
 }
 
 export const workflowMessages = {
-  submitting: "Starting workflow...",
-  triggered: "The product content workflow has started.",
-  generating: "Generating and reviewing the description in Orchestra...",
-  awaitingApproval:
-    "Your description is ready. Use it as-is, open Orchestra to Approve/Reject, or generate another version.",
-  approved: "Approved in Orchestra.",
-  rejected: "Rejected or returned for more detail in Orchestra.",
-  runFailed: "The workflow run reported a failure.",
-  genericError: "The workflow could not be started. Please try again.",
-  statusError: "Could not refresh the workflow status.",
-  openInOrchestra: "Approve in Orchestra",
+  submitting: "Starting generation...",
+  triggered: "Generation has started.",
+  generating: "Generating and reviewing the description...",
+  descriptionReady:
+    "Copy or download this draft, or generate another version if you want a different one.",
+  rejected: "The review asked for changes. Generate another version to try again.",
+  runFailed: "Generation failed. Please try again.",
+  genericError: "The description could not be started. Please try again.",
+  statusError: "Could not refresh the generation status.",
   generateAnother: "Generate another",
   copyDraft: "Copy",
   copied: "Copied",
