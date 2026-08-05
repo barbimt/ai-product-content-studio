@@ -117,6 +117,12 @@ export function ProductContentWorkflow() {
         return;
       }
       setHistory(body.items);
+      setSelectedHistory((current) => {
+        if (!current) return current;
+        return (
+          body.items.find((item) => item.runId === current.runId) ?? current
+        );
+      });
     } catch {
       setHistoryError(workflowMessages.historyError);
       setHistory([]);
@@ -145,6 +151,12 @@ export function ProductContentWorkflow() {
           return;
         }
         setHistory(body.items);
+        setSelectedHistory((current) => {
+          if (!current) return current;
+          return (
+            body.items.find((item) => item.runId === current.runId) ?? current
+          );
+        });
         setHistoryError(null);
       } catch {
         if (cancelled) return;
@@ -161,7 +173,7 @@ export function ProductContentWorkflow() {
     };
   }, []);
 
-  async function applyStatus(runId: string): Promise<void> {
+  async function applyStatus(runId: string): Promise<RunView | null> {
     const response = await fetch(runStatusEndpoint(runId), {
       cache: "no-store",
     });
@@ -175,7 +187,7 @@ export function ProductContentWorkflow() {
           ? { ...prev, statusError: message, refreshing: false }
           : prev,
       );
-      return;
+      return null;
     }
 
     setSubmission((prev) => {
@@ -187,6 +199,14 @@ export function ProductContentWorkflow() {
         run: mergeRunView(prev.run, body),
       };
     });
+
+    if (isReadyPhase(body.phase) || body.draft) {
+      setSelectedHistory((current) =>
+        current?.runId === body.runId ? null : current,
+      );
+    }
+
+    return body;
   }
 
   useEffect(() => {
@@ -223,10 +243,16 @@ export function ProductContentWorkflow() {
           };
         });
 
-        if (body.phase === "generating") {
-          await applyStatus(trackingRunId!);
-        } else {
+        if (isReadyPhase(body.phase) || body.draft) {
+          setSelectedHistory((current) =>
+            current?.runId === body.runId ? null : current,
+          );
           void loadHistory();
+        } else if (body.phase === "generating") {
+          const latest = await applyStatus(trackingRunId!);
+          if (latest && (isReadyPhase(latest.phase) || latest.draft)) {
+            void loadHistory();
+          }
         }
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -317,10 +343,55 @@ export function ProductContentWorkflow() {
     }
   }
 
-  function handleSelectHistory(item: HistoryItem) {
+  async function handleSelectHistory(item: HistoryItem) {
+    // Clicking the selected row again returns to the latest live result.
+    if (selectedHistory?.runId === item.runId) {
+      setSelectedHistory(null);
+      return;
+    }
+
+    // Prefer the live tracking view for the active run (avoids a stale snapshot).
+    if (submission.status === "tracking" && submission.runId === item.runId) {
+      setSelectedHistory(null);
+      setFormDefaults(submission.run.product);
+      setFormKey((value) => value + 1);
+      if (!submission.run.draft) {
+        await applyStatus(item.runId);
+      }
+      return;
+    }
+
     setSelectedHistory(item);
     setFormDefaults(item.product);
     setFormKey((value) => value + 1);
+
+    if (item.draft) return;
+
+    try {
+      const response = await fetch(runStatusEndpoint(item.runId), {
+        cache: "no-store",
+      });
+      const body: RunStatusResponseBody = await response.json();
+      if (!response.ok || "error" in body || !body.draft) return;
+
+      const hydrated: HistoryItem = {
+        runId: body.runId,
+        product:
+          body.product.productName.length > 0 ? body.product : item.product,
+        draft: body.draft,
+        review: body.review,
+        phase: body.phase,
+        createdAt: item.createdAt,
+      };
+      setSelectedHistory((current) =>
+        current?.runId === item.runId ? hydrated : current,
+      );
+      setHistory((items) =>
+        items.map((entry) => (entry.runId === item.runId ? hydrated : entry)),
+      );
+    } catch {
+      // Keep the pending message; history refresh may fill it later.
+    }
   }
 
   const run = submission.status === "tracking" ? submission.run : null;
@@ -417,7 +488,7 @@ export function ProductContentWorkflow() {
                 />
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Draft not ready yet for this run.
+                  {workflowMessages.historyDraftPending}
                 </p>
               )}
               <ProductSubmissionSummary product={selectedHistory.product} />

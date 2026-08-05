@@ -199,6 +199,156 @@ describe("ProductContentWorkflow", () => {
     expect(screen.getByText("Ready draft from status.")).toBeInTheDocument();
   });
 
+  it("returns to the live draft when re-selecting the active history run", async () => {
+    const user = userEvent.setup();
+    const historyItem = {
+      runId: "run-live",
+      product: {
+        productName: "BrightSip Glass Bottle 750ml",
+        category: "Reusable bottles",
+        features: "750ml borosilicate glass, silicone sleeve",
+        tone: "Friendly" as const,
+      },
+      draft: null,
+      review: null,
+      phase: "generating" as const,
+      createdAt: "2026-08-05T18:00:00.000Z",
+    };
+
+    vi.mocked(globalThis.fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/api/orchestra/history")) {
+        return new Response(JSON.stringify({ items: [historyItem] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (url.includes("/wait")) {
+        return new Response(
+          JSON.stringify({
+            runId: "run-live",
+            phase: "awaiting_approval",
+            product: historyItem.product,
+            draft: "BrightSip draft from live wait.",
+            review: { status: "passed", reason: "Looks good." },
+            approvalUrl: null,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (url.includes("/api/orchestra/runs/") && !url.includes("/wait")) {
+        return new Response(
+          JSON.stringify({
+            runId: "run-live",
+            phase: "awaiting_approval",
+            product: historyItem.product,
+            draft: "BrightSip draft from live wait.",
+            review: { status: "passed", reason: "Looks good." },
+            approvalUrl: null,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          runId: "run-live",
+          status: "triggered",
+          message: "The product content workflow has started.",
+        }),
+        { status: 202, headers: { "Content-Type": "application/json" } },
+      );
+    });
+
+    render(<ProductContentWorkflow />);
+    expect(
+      await screen.findByRole("button", {
+        name: /brightsip glass bottle 750ml/i,
+      }),
+    ).toBeInTheDocument();
+
+    await fillValidForm(user);
+    await user.click(screen.getByRole("button", { name: /generate description/i }));
+    expect(await screen.findByText(/description ready/i)).toBeInTheDocument();
+    expect(
+      screen.getByText("BrightSip draft from live wait."),
+    ).toBeInTheDocument();
+
+    // Stale history snapshot without draft should not trap the UI.
+    await user.click(
+      screen.getByRole("button", { name: /brightsip glass bottle 750ml/i }),
+    );
+    expect(await screen.findByText(/description ready/i)).toBeInTheDocument();
+    expect(
+      screen.getByText("BrightSip draft from live wait."),
+    ).toBeInTheDocument();
+  });
+
+  it("hydrates a history item that was selected before its draft arrived", async () => {
+    const user = userEvent.setup();
+    let historyDraft: string | null = null;
+
+    vi.mocked(globalThis.fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/api/orchestra/history")) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                runId: "run-old",
+                product: {
+                  productName: "QuietCharge Pad",
+                  category: "Accessories",
+                  features: "MagSafe compatible",
+                  tone: "Professional",
+                },
+                draft: historyDraft,
+                review: historyDraft
+                  ? { status: "passed", reason: "Good." }
+                  : null,
+                phase: historyDraft ? "approved" : "generating",
+                createdAt: "2026-08-05T17:00:00.000Z",
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (url.includes("/api/orchestra/runs/run-old")) {
+        historyDraft = "QuietCharge pad draft text.";
+        return new Response(
+          JSON.stringify({
+            runId: "run-old",
+            phase: "approved",
+            product: {
+              productName: "QuietCharge Pad",
+              category: "Accessories",
+              features: "MagSafe compatible",
+              tone: "Professional",
+            },
+            draft: historyDraft,
+            review: { status: "passed", reason: "Good." },
+            approvalUrl: null,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(JSON.stringify({ items: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+
+    render(<ProductContentWorkflow />);
+    const historyButton = await screen.findByRole("button", {
+      name: /quietcharge pad/i,
+    });
+    await user.click(historyButton);
+
+    expect(
+      await screen.findByText("QuietCharge pad draft text."),
+    ).toBeInTheDocument();
+  });
+
   it("renders a safe error message when the request fails", async () => {
     const user = userEvent.setup();
     vi.mocked(globalThis.fetch).mockResolvedValue(
