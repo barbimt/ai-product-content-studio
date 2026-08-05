@@ -173,13 +173,13 @@ export function ProductContentWorkflow() {
     };
   }, [trackingRunId, trackingPhase]);
 
-  async function handleSubmit(
-    values: ProductDescriptionInput,
-    options?: { preservePreviousDraft?: boolean },
-  ) {
+  async function handleSubmit(values: ProductDescriptionInput) {
     if (submission.status === "submitting") return;
 
-    if (!options?.preservePreviousDraft) {
+    // Keep the last draft so a new Generate description can show Previous vs New.
+    if (submission.status === "tracking" && submission.run.draft) {
+      setPreviousDraft(submission.run.draft);
+    } else {
       setPreviousDraft(null);
     }
 
@@ -238,16 +238,6 @@ export function ProductContentWorkflow() {
           : prev,
       );
     }
-  }
-
-  function handleGenerateAnother() {
-    if (submission.status !== "tracking") return;
-    const product = submission.run.product;
-    if (!product.productName.trim()) return;
-    if (submission.run.draft) {
-      setPreviousDraft(submission.run.draft);
-    }
-    void handleSubmit(product, { preservePreviousDraft: true });
   }
 
   const run = submission.status === "tracking" ? submission.run : null;
@@ -359,14 +349,6 @@ export function ProductContentWorkflow() {
                 </AlertDescription>
               </Alert>
               {run.draft ? readyDraftSection(run.draft, run.review) : null}
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleGenerateAnother}
-                disabled={submission.status === "submitting"}
-              >
-                {workflowMessages.generateAnother}
-              </Button>
             </>
           ) : null}
 
@@ -378,14 +360,6 @@ export function ProductContentWorkflow() {
                 <AlertDescription>{workflowMessages.rejected}</AlertDescription>
               </Alert>
               {run.draft ? readyDraftSection(run.draft, run.review) : null}
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleGenerateAnother}
-                disabled={submission.status === "submitting"}
-              >
-                {workflowMessages.generateAnother}
-              </Button>
             </>
           ) : null}
 

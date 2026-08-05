@@ -11,8 +11,8 @@ export default function Home() {
             Product Content Studio
           </h1>
           <p className="text-sm text-muted-foreground">
-            Generate ecommerce product descriptions with Orchestra. Copy,
-            download, or create another version when you need one.
+            Generate ecommerce product descriptions with Orchestra. Copy or
+            download the draft, or submit again for a new version.
           </p>
         </div>
         <div className="mt-10">

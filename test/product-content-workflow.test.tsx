@@ -72,15 +72,12 @@ describe("ProductContentWorkflow", () => {
       await screen.findByText(/description ready/i),
     ).toBeInTheDocument();
     expect(screen.getByText("A clear product description.")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /generate another/i }),
-    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^copy$/i })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /download \.txt/i }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /approve in orchestra/i }),
+      screen.queryByRole("button", { name: /generate another/i }),
     ).not.toBeInTheDocument();
 
     await waitFor(() => {

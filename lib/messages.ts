@@ -13,12 +13,12 @@ export const workflowMessages = {
   triggered: "Generation has started.",
   generating: "Generating and reviewing the description...",
   descriptionReady:
-    "Copy or download this draft, or generate another version if you want a different one.",
-  rejected: "The review asked for changes. Generate another version to try again.",
+    "Copy or download this draft. Submit the form again if you want a new version.",
+  rejected:
+    "The review asked for changes. Submit the form again to try a new version.",
   runFailed: "Generation failed. Please try again.",
   genericError: "The description could not be started. Please try again.",
   statusError: "Could not refresh the generation status.",
-  generateAnother: "Generate another",
   copyDraft: "Copy",
   copied: "Copied",
   downloadDraft: "Download .txt",

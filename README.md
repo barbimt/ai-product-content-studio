@@ -20,7 +20,8 @@ flowchart LR
 3. The browser makes **one** wait request (`/api/orchestra/runs/{runId}/wait`).
 4. Orchestra runs **Generate → Review → Notify Product Content Studio**.
 5. Notify `POST`s draft + review to `/api/orchestra/callback` (shared secret).
-6. The UI shows the draft with Copy, Download `.txt`, and Generate another.
+6. The UI shows the draft with Copy and Download `.txt`. Submit the form again
+   for a new version.
 
 ## Stack
 
