@@ -11,6 +11,8 @@ import { EmptyWorkflowState } from "./empty-workflow-state";
 import { RequestErrorAlert } from "./request-error-alert";
 import { ProductSubmissionSummary } from "./product-submission-summary";
 import { GeneratedDraft } from "./generated-draft";
+import { DraftExportActions } from "./draft-export-actions";
+import { DraftVersionCompare } from "./draft-version-compare";
 import { ApprovalActions } from "./approval-actions";
 import {
   GENERATE_ENDPOINT,
@@ -91,12 +93,23 @@ export function ProductContentWorkflow() {
   const [submission, setSubmission] = useState<SubmissionState>({
     status: "idle",
   });
+  const [previousDraft, setPreviousDraft] = useState<string | null>(null);
 
   const trackingRunId =
     submission.status === "tracking" ? submission.runId : null;
   const trackingPhase =
     submission.status === "tracking" ? submission.run.phase : null;
   const awaitingApproval = trackingPhase === "awaiting_approval";
+  const currentDraft =
+    submission.status === "tracking" ? submission.run.draft : null;
+  const showVersionCompare = Boolean(
+    previousDraft &&
+      currentDraft &&
+      previousDraft !== currentDraft &&
+      trackingPhase &&
+      trackingPhase !== "generating" &&
+      trackingPhase !== "failed",
+  );
 
   async function applyStatus(runId: string): Promise<void> {
     const response = await fetch(runStatusEndpoint(runId), {
@@ -198,8 +211,16 @@ export function ProductContentWorkflow() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [trackingRunId, awaitingApproval]);
 
-  async function handleSubmit(values: ProductDescriptionInput) {
+  async function handleSubmit(
+    values: ProductDescriptionInput,
+    options?: { preservePreviousDraft?: boolean },
+  ) {
     if (submission.status === "submitting") return;
+
+    if (!options?.preservePreviousDraft) {
+      setPreviousDraft(null);
+    }
+
     setSubmission({ status: "submitting" });
 
     try {
@@ -261,7 +282,44 @@ export function ProductContentWorkflow() {
     if (submission.status !== "tracking") return;
     const product = submission.run.product;
     if (!product.productName.trim()) return;
-    void handleSubmit(product);
+    if (submission.run.draft) {
+      setPreviousDraft(submission.run.draft);
+    }
+    void handleSubmit(product, { preservePreviousDraft: true });
+  }
+
+  function draftBlock(draft: string, review: RunView["review"]) {
+    return (
+      <GeneratedDraft
+        draft={draft}
+        review={review}
+        productName={run?.product.productName ?? "product"}
+      />
+    );
+  }
+
+  function readyDraftSection(draft: string, review: RunView["review"]) {
+    if (showVersionCompare && previousDraft) {
+      return (
+        <>
+          <DraftVersionCompare
+            previousDraft={previousDraft}
+            currentDraft={draft}
+          />
+          {review ? (
+            <div className="rounded-md bg-muted/60 p-3 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Review: </span>
+              {review.reason}
+            </div>
+          ) : null}
+          <DraftExportActions
+            draft={draft}
+            productName={run?.product.productName ?? "product"}
+          />
+        </>
+      );
+    }
+    return draftBlock(draft, review);
   }
 
   const steps = getWorkflowStepsForState(toWorkflowPhase(submission));
@@ -303,9 +361,16 @@ export function ProductContentWorkflow() {
                 <AlertTitle>Generating in Orchestra</AlertTitle>
                 <AlertDescription>{workflowMessages.generating}</AlertDescription>
               </Alert>
-              {run.draft ? (
-                <GeneratedDraft draft={run.draft} review={run.review} />
+              {previousDraft ? (
+                <GeneratedDraft
+                  title="Previous draft"
+                  draft={previousDraft}
+                  review={null}
+                  productName={run.product.productName}
+                  showExport={false}
+                />
               ) : null}
+              {run.draft ? draftBlock(run.draft, run.review) : null}
               <Button
                 type="button"
                 variant="outline"
@@ -329,9 +394,7 @@ export function ProductContentWorkflow() {
                   {workflowMessages.awaitingApproval}
                 </AlertDescription>
               </Alert>
-              {run.draft ? (
-                <GeneratedDraft draft={run.draft} review={run.review} />
-              ) : null}
+              {run.draft ? readyDraftSection(run.draft, run.review) : null}
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
@@ -368,9 +431,7 @@ export function ProductContentWorkflow() {
                 <AlertTitle>Approved</AlertTitle>
                 <AlertDescription>{workflowMessages.approved}</AlertDescription>
               </Alert>
-              {run.draft ? (
-                <GeneratedDraft draft={run.draft} review={run.review} />
-              ) : null}
+              {run.draft ? readyDraftSection(run.draft, run.review) : null}
               <Button
                 type="button"
                 size="sm"
@@ -389,9 +450,7 @@ export function ProductContentWorkflow() {
                 <AlertTitle>Rejected</AlertTitle>
                 <AlertDescription>{workflowMessages.rejected}</AlertDescription>
               </Alert>
-              {run.draft ? (
-                <GeneratedDraft draft={run.draft} review={run.review} />
-              ) : null}
+              {run.draft ? readyDraftSection(run.draft, run.review) : null}
               <Button
                 type="button"
                 size="sm"

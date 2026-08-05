@@ -21,4 +21,7 @@ export const workflowMessages = {
   statusError: "Could not refresh the workflow status.",
   openInOrchestra: "Approve in Orchestra",
   generateAnother: "Generate another",
+  copyDraft: "Copy",
+  copied: "Copied",
+  downloadDraft: "Download .txt",
 } as const;

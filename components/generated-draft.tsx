@@ -1,5 +1,6 @@
 import { CircleCheck, TriangleAlert } from "lucide-react";
 
+import { DraftExportActions } from "@/components/draft-export-actions";
 import { cn } from "@/lib/utils";
 import type { ReviewOutcome } from "@/types/api";
 
@@ -27,14 +28,20 @@ function ReviewBadge({ status }: { status: ReviewOutcome["status"] }) {
 export function GeneratedDraft({
   draft,
   review,
+  productName = "product",
+  showExport = true,
+  title = "Generated draft",
 }: {
   draft: string;
   review: ReviewOutcome | null;
+  productName?: string;
+  showExport?: boolean;
+  title?: string;
 }) {
   return (
     <div className="space-y-3 rounded-lg border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold">Generated draft</h3>
+        <h3 className="text-sm font-semibold">{title}</h3>
         {review ? <ReviewBadge status={review.status} /> : null}
       </div>
 
@@ -47,6 +54,10 @@ export function GeneratedDraft({
           <span className="font-medium text-foreground">Review: </span>
           {review.reason}
         </div>
+      ) : null}
+
+      {showExport ? (
+        <DraftExportActions draft={draft} productName={productName} />
       ) : null}
     </div>
   );

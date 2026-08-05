@@ -75,6 +75,10 @@ describe("ProductContentWorkflow", () => {
     expect(
       screen.getByRole("button", { name: /generate another/i }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^copy$/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /download \.txt/i }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /approve in orchestra/i }),
     ).toHaveAttribute(
@@ -98,14 +102,16 @@ describe("ProductContentWorkflow", () => {
 
   it("does not let a late wait timeout overwrite a ready draft", async () => {
     const user = userEvent.setup();
-    let resolveWait: ((value: Response) => void) | null = null;
+    const waitGate: {
+      resolve: ((value: Response) => void) | null;
+    } = { resolve: null };
 
     vi.mocked(globalThis.fetch).mockImplementation(async (input) => {
       const url = String(input);
       if (url.includes("/wait")) {
         // Intentionally ignore abort so we can assert merge guards against a late timeout body.
         return new Promise<Response>((resolve) => {
-          resolveWait = resolve;
+          waitGate.resolve = resolve;
         });
       }
       if (url.includes("/api/orchestra/runs/") && !url.includes("/wait")) {
@@ -149,7 +155,7 @@ describe("ProductContentWorkflow", () => {
 
     expect(await screen.findByText(/description ready/i)).toBeInTheDocument();
 
-    resolveWait?.(
+    waitGate.resolve?.(
       new Response(
         JSON.stringify({
           runId: "run-99",
