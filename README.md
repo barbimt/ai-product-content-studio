@@ -1,36 +1,144 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Product Content Studio
 
-## Getting Started
+Next.js app that starts an Orchestra pipeline to draft ecommerce product
+descriptions, shows the draft in the UI, and sends people to Orchestra for the
+final Approve / Reject.
 
-First, run the development server:
+## How it works
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```mermaid
+flowchart LR
+    A[Product form] --> B[POST /api/orchestra/generate]
+    B --> C[Orchestra start webhook]
+    C --> D[Generate]
+    D --> E[Review]
+    E --> F[Notify callback]
+    F --> G[Approve or request details in Orchestra]
+    F --> H[UI shows draft]
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. The form posts product name, category, features, and tone.
+2. The server starts the Orchestra pipeline and returns a `runId`.
+3. The browser makes **one** wait request (`/api/orchestra/runs/{runId}/wait`).
+4. Orchestra runs **Generate → Review → Notify Product Content Studio**.
+5. Notify `POST`s draft + review to `/api/orchestra/callback` (shared secret).
+6. The wait request ends; the UI shows the draft and a link to Approve in Orchestra.
+7. After the human decision, refresh status (tab focus or button). That part still
+   uses Orchestra’s Metadata API.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Pipeline branches after Notify:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- review `APPROVE` → Final content approval
+- review `REVIEW` → Request additional product details
 
-## Learn More
+## Stack
 
-To learn more about Next.js, take a look at the following resources:
+- Next.js 16 (App Router), React 19, TypeScript
+- Tailwind CSS v4, shadcn/ui
+- React Hook Form + Zod
+- Vitest
+- Orchestra (webhook start, HTTP callback, Metadata API for later status)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+No database and no login. Run data lives in memory on the server process.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Local setup
+
+```bash
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### Environment variables
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `ORCHESTRA_WEBHOOK_URL` | yes | Pipeline start URL from Orchestra |
+| `ORCHESTRA_API_TOKEN` | yes* | Bearer token for Orchestra Metadata API |
+| `ORCHESTRA_CALLBACK_SECRET` | yes | Shared secret for the Notify HTTP header |
+| `ORCHESTRA_REQUEST_TIMEOUT_MS` | no | Outbound Orchestra timeout (default `15000`) |
+| `ORCHESTRA_API_BASE_URL` | no | Defaults to `https://app.getorchestra.io/api/engine/public` |
+| `ORCHESTRA_UI_BASE_URL` | no | Defaults to `https://app.getorchestra.io` |
+
+\*Needed to refresh Approve / Reject status after the human decision.
+
+## Orchestra setup
+
+Expected pipeline shape:
+
+`Generate → Review → Notify Product Content Studio → (Final approval | Request details)`
+
+Notify HTTP task:
+
+- **Connection Base URL** — public app URL (Vercel production URL)
+- **Path** — `/api/orchestra/callback`
+- **Method** — `POST`
+- **Header**
+
+```json
+{
+  "X-Orchestra-Callback-Secret": "<same value as ORCHESTRA_CALLBACK_SECRET>"
+}
+```
+
+- **Body** (conceptually)
+
+```json
+{
+  "runId": "<pipeline run id>",
+  "description": "<generated description>",
+  "review": {
+    "status": "APPROVE | REVIEW",
+    "reason": "<short reason>"
+  }
+}
+```
+
+Local `npm run dev` is not reachable from Orchestra. Use a **Vercel deploy** (or a
+tunnel) so Notify can hit the callback.
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npx vercel login
+npx vercel
+npx vercel --prod
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Add the env vars above for **Production** and **Preview**, then redeploy.
+
+In Orchestra, set the HTTP connection Base URL to your Vercel URL, for example:
+
+`https://your-project.vercel.app`
+
+Path stays `/api/orchestra/callback`.
+
+### Limits to know
+
+- `/wait` uses `maxDuration = 120`. Hobby plans may cap lower (~60s). If wait
+  times out, the callback can still land — use **Check status**.
+- In-memory store: generate and callback must hit the **same** deployment /
+  instance. Prefer one production deployment for demos.
+
+## API routes
+
+| Method | Path | Role |
+|--------|------|------|
+| `POST` | `/api/orchestra/generate` | Validate form, start pipeline, remember run |
+| `POST` | `/api/orchestra/callback` | Receive draft + review from Orchestra Notify |
+| `GET` | `/api/orchestra/runs/[runId]/wait` | Wait until callback (or timeout ~110s) |
+| `GET` | `/api/orchestra/runs/[runId]` | Current run view (draft + approval phase) |
+
+Secrets never go to the browser. The UI only talks to these routes.
+
+## Commands
+
+```bash
+npm run dev    # local app
+npm test       # vitest
+npm run lint   # eslint
+npm run build  # production build
+npm start      # serve the build
+```
