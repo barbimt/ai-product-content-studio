@@ -285,7 +285,9 @@ describe("ProductContentWorkflow", () => {
 
   it("shows loading while hydrating a history item draft", async () => {
     const user = userEvent.setup();
-    let resolveStatus: ((value: Response) => void) | null = null;
+    const statusGate: {
+      resolve: ((value: Response) => void) | null;
+    } = { resolve: null };
 
     vi.mocked(globalThis.fetch).mockImplementation(async (input) => {
       const url = String(input);
@@ -313,7 +315,7 @@ describe("ProductContentWorkflow", () => {
       }
       if (url.includes("/api/orchestra/runs/run-old")) {
         return new Promise<Response>((resolve) => {
-          resolveStatus = resolve;
+          statusGate.resolve = resolve;
         });
       }
       return new Response(JSON.stringify({ items: [] }), {
@@ -332,7 +334,7 @@ describe("ProductContentWorkflow", () => {
       await screen.findByText(/loading this description from orchestra/i),
     ).toBeInTheDocument();
 
-    resolveStatus?.(
+    statusGate.resolve?.(
       new Response(
         JSON.stringify({
           runId: "run-old",
