@@ -131,6 +131,14 @@ function parseTaskRuns(data: unknown): OrchestraTaskRun[] {
     const status = record.status;
     if (typeof taskName !== "string" || typeof status !== "string") continue;
     if (!knownStatuses.has(status as OrchestraRunStatus)) continue;
+    const taskParameters = record.taskParameters;
+    const prompt =
+      typeof taskParameters === "object" &&
+      taskParameters !== null &&
+      typeof (taskParameters as Record<string, unknown>).prompt === "string"
+        ? ((taskParameters as Record<string, unknown>).prompt as string)
+        : null;
+
     tasks.push({
       taskName,
       status: status as OrchestraRunStatus,
@@ -139,9 +147,16 @@ function parseTaskRuns(data: unknown): OrchestraTaskRun[] {
           ? record.externalMessage
           : null,
       message: typeof record.message === "string" ? record.message : null,
+      prompt,
     });
   }
   return tasks;
+}
+
+function parseCreatedAt(data: unknown): string | null {
+  if (typeof data !== "object" || data === null) return null;
+  const createdAt = (data as Record<string, unknown>).createdAt;
+  return typeof createdAt === "string" && createdAt.length > 0 ? createdAt : null;
 }
 
 export async function triggerProductDescriptionPipeline(
@@ -195,9 +210,12 @@ export async function getOrchestraRunSnapshot(
   assertOk(statusResponse);
   assertOk(tasksResponse);
 
+  const statusJson = await readJson(statusResponse);
+
   return {
     pipelineRunId,
-    runStatus: parseRunStatus(await readJson(statusResponse)),
+    runStatus: parseRunStatus(statusJson),
+    createdAt: parseCreatedAt(statusJson),
     tasks: parseTaskRuns(await readJson(tasksResponse)),
   };
 }

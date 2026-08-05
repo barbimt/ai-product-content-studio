@@ -12,14 +12,14 @@ function task(
   status: OrchestraTaskRun["status"],
   externalMessage: string | null = null,
 ): OrchestraTaskRun {
-  return { taskName, status, externalMessage, message: null };
+  return { taskName, status, externalMessage, message: null, prompt: null };
 }
 
 function snapshot(
   runStatus: OrchestraRunSnapshot["runStatus"],
   tasks: OrchestraTaskRun[],
 ): OrchestraRunSnapshot {
-  return { pipelineRunId: "run-1", runStatus, tasks };
+  return { pipelineRunId: "run-1", runStatus, createdAt: null, tasks };
 }
 
 describe("orchestra status mapping", () => {

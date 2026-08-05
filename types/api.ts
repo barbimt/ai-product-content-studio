@@ -27,6 +27,19 @@ export type GeneratePipelineResponse = {
   message: string;
 };
 
+export type HistoryItem = {
+  runId: string;
+  product: ProductDescriptionInput;
+  draft: string | null;
+  review: ReviewOutcome | null;
+  phase: RunPhase;
+  createdAt: string | null;
+};
+
+export type HistoryResponse = {
+  items: HistoryItem[];
+};
+
 export type ApiErrorCode =
   | "invalid_request"
   | "not_found"

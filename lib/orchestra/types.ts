@@ -31,10 +31,12 @@ export type OrchestraTaskRun = {
   status: OrchestraRunStatus;
   externalMessage: string | null;
   message: string | null;
+  prompt: string | null;
 };
 
 export type OrchestraRunSnapshot = {
   pipelineRunId: string;
   runStatus: OrchestraRunStatus;
+  createdAt: string | null;
   tasks: OrchestraTaskRun[];
 };

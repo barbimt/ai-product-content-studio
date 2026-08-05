@@ -17,6 +17,19 @@ async function fillValidForm(user: ReturnType<typeof userEvent.setup>) {
 
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn());
+  vi.mocked(globalThis.fetch).mockImplementation(async (input) => {
+    const url = String(input);
+    if (url.includes("/api/orchestra/history")) {
+      return new Response(JSON.stringify({ items: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({}), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  });
 });
 
 afterEach(() => {
@@ -36,6 +49,12 @@ describe("ProductContentWorkflow", () => {
     const user = userEvent.setup();
     vi.mocked(globalThis.fetch).mockImplementation(async (input) => {
       const url = String(input);
+      if (url.includes("/api/orchestra/history")) {
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
       if (url.includes("/wait")) {
         return new Response(
           JSON.stringify({
@@ -71,9 +90,7 @@ describe("ProductContentWorkflow", () => {
     expect(
       await screen.findByText(/description ready/i),
     ).toBeInTheDocument();
-    expect(
-      screen.getAllByText("A clear product description.").length,
-    ).toBeGreaterThan(0);
+    expect(screen.getByText("A clear product description.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^copy$/i })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /download \.txt/i }),
@@ -104,6 +121,12 @@ describe("ProductContentWorkflow", () => {
 
     vi.mocked(globalThis.fetch).mockImplementation(async (input) => {
       const url = String(input);
+      if (url.includes("/api/orchestra/history")) {
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
       if (url.includes("/wait")) {
         // Intentionally ignore abort so we can assert merge guards against a late timeout body.
         return new Promise<Response>((resolve) => {
@@ -173,9 +196,7 @@ describe("ProductContentWorkflow", () => {
     await waitFor(() => {
       expect(screen.getByText(/description ready/i)).toBeInTheDocument();
     });
-    expect(
-      screen.getAllByText("Ready draft from status.").length,
-    ).toBeGreaterThan(0);
+    expect(screen.getByText("Ready draft from status.")).toBeInTheDocument();
   });
 
   it("renders a safe error message when the request fails", async () => {

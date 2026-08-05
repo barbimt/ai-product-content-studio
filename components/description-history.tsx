@@ -1,29 +1,46 @@
 "use client";
 
-import type { HistoryItem } from "@/lib/history/browser-history";
+import type { HistoryItem } from "@/types/api";
 import { workflowMessages } from "@/lib/messages";
 import { cn } from "@/lib/utils";
 
-function formatSavedAt(savedAt: number): string {
+function formatCreatedAt(createdAt: string | null): string {
+  if (!createdAt) return "Unknown time";
   try {
     return new Intl.DateTimeFormat(undefined, {
       dateStyle: "medium",
       timeStyle: "short",
-    }).format(new Date(savedAt));
+    }).format(new Date(createdAt));
   } catch {
-    return new Date(savedAt).toLocaleString();
+    return createdAt;
   }
 }
 
 export function DescriptionHistory({
   items,
   selectedRunId,
+  loading,
+  error,
   onSelect,
 }: {
   items: HistoryItem[];
   selectedRunId: string | null;
+  loading: boolean;
+  error: string | null;
   onSelect: (item: HistoryItem) => void;
 }) {
+  if (loading) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {workflowMessages.historyLoading}
+      </p>
+    );
+  }
+
+  if (error) {
+    return <p className="text-sm text-destructive">{error}</p>;
+  }
+
   if (items.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -50,10 +67,10 @@ export function DescriptionHistory({
                 {item.product.productName}
               </span>
               <span className="line-clamp-2 text-xs text-muted-foreground">
-                {item.draft}
+                {item.draft ?? "Draft not ready yet"}
               </span>
               <span className="text-xs text-muted-foreground">
-                {formatSavedAt(item.savedAt)}
+                {formatCreatedAt(item.createdAt)}
               </span>
             </button>
           </li>

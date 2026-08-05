@@ -15,18 +15,16 @@ import { DraftVersionCompare } from "./draft-version-compare";
 import { DescriptionHistory } from "./description-history";
 import {
   GENERATE_ENDPOINT,
+  HISTORY_ENDPOINT,
   runStatusEndpoint,
   runWaitEndpoint,
   workflowMessages,
 } from "@/lib/messages";
-import {
-  readHistory,
-  saveHistoryItem,
-  type HistoryItem,
-} from "@/lib/history/browser-history";
 import type { ProductDescriptionInput } from "@/lib/validation/product-description";
 import type {
   GenerateResponseBody,
+  HistoryItem,
+  HistoryResponse,
   RunStatusResponseBody,
   RunView,
 } from "@/types/api";
@@ -79,7 +77,9 @@ export function ProductContentWorkflow() {
     status: "idle",
   });
   const [previousDraft, setPreviousDraft] = useState<string | null>(null);
-  const [history, setHistory] = useState<HistoryItem[]>(() => readHistory());
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [selectedHistory, setSelectedHistory] = useState<HistoryItem | null>(
     null,
   );
@@ -103,19 +103,64 @@ export function ProductContentWorkflow() {
       !selectedHistory,
   );
 
-  function persistReadyRun(run: RunView) {
-    if (!run.draft) return;
-    if (!isReadyPhase(run.phase) && run.phase !== "rejected") return;
-    setHistory(
-      saveHistoryItem({
-        runId: run.runId,
-        product: run.product,
-        draft: run.draft,
-        review: run.review,
-        savedAt: Date.now(),
-      }),
-    );
+  async function loadHistory() {
+    setHistoryError(null);
+    try {
+      const response = await fetch(HISTORY_ENDPOINT, { cache: "no-store" });
+      const body = (await response.json()) as
+        | HistoryResponse
+        | { error: { message: string } };
+      if (!response.ok || "error" in body) {
+        setHistoryError(
+          "error" in body ? body.error.message : workflowMessages.historyError,
+        );
+        setHistory([]);
+        return;
+      }
+      setHistory(body.items);
+    } catch {
+      setHistoryError(workflowMessages.historyError);
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
   }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const response = await fetch(HISTORY_ENDPOINT, { cache: "no-store" });
+        const body = (await response.json()) as
+          | HistoryResponse
+          | { error: { message: string } };
+        if (cancelled) return;
+        if (!response.ok || "error" in body) {
+          setHistoryError(
+            "error" in body
+              ? body.error.message
+              : workflowMessages.historyError,
+          );
+          setHistory([]);
+          return;
+        }
+        setHistory(body.items);
+        setHistoryError(null);
+      } catch {
+        if (cancelled) return;
+        setHistoryError(workflowMessages.historyError);
+        setHistory([]);
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function applyStatus(runId: string): Promise<void> {
     const response = await fetch(runStatusEndpoint(runId), {
@@ -134,18 +179,15 @@ export function ProductContentWorkflow() {
       return;
     }
 
-    let nextRun: RunView | null = null;
     setSubmission((prev) => {
       if (prev.status !== "tracking" || prev.runId !== body.runId) return prev;
-      nextRun = mergeRunView(prev.run, body);
       return {
         ...prev,
         statusError: null,
         refreshing: false,
-        run: nextRun,
+        run: mergeRunView(prev.run, body),
       };
     });
-    if (nextRun) persistReadyRun(nextRun);
   }
 
   useEffect(() => {
@@ -171,22 +213,21 @@ export function ProductContentWorkflow() {
           return;
         }
 
-        let nextRun: RunView | null = null;
         setSubmission((prev) => {
           if (prev.status !== "tracking" || prev.runId !== body.runId) {
             return prev;
           }
-          nextRun = mergeRunView(prev.run, body);
           return {
             ...prev,
             statusError: null,
-            run: nextRun,
+            run: mergeRunView(prev.run, body),
           };
         });
-        if (nextRun) persistReadyRun(nextRun);
 
         if (body.phase === "generating") {
           await applyStatus(trackingRunId!);
+        } else {
+          void loadHistory();
         }
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -249,6 +290,7 @@ export function ProductContentWorkflow() {
           approvalUrl: null,
         },
       });
+      void loadHistory();
     } catch {
       setSubmission({
         status: "submit_error",
@@ -262,6 +304,7 @@ export function ProductContentWorkflow() {
     setSubmission({ ...submission, refreshing: true, statusError: null });
     try {
       await applyStatus(submission.runId);
+      void loadHistory();
     } catch {
       setSubmission((prev) =>
         prev.status === "tracking"
@@ -337,6 +380,8 @@ export function ProductContentWorkflow() {
           <DescriptionHistory
             items={history}
             selectedRunId={selectedHistory?.runId ?? run?.runId ?? null}
+            loading={historyLoading}
+            error={historyError}
             onSelect={handleSelectHistory}
           />
         </section>
@@ -363,16 +408,22 @@ export function ProductContentWorkflow() {
             <>
               <Alert>
                 <CircleCheck />
-                <AlertTitle>Saved description</AlertTitle>
+                <AlertTitle>Orchestra run</AlertTitle>
                 <AlertDescription>
                   {workflowMessages.historySelected}
                 </AlertDescription>
               </Alert>
-              <GeneratedDraft
-                draft={selectedHistory.draft}
-                review={selectedHistory.review}
-                productName={selectedHistory.product.productName}
-              />
+              {selectedHistory.draft ? (
+                <GeneratedDraft
+                  draft={selectedHistory.draft}
+                  review={selectedHistory.review}
+                  productName={selectedHistory.product.productName}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Draft not ready yet for this run.
+                </p>
+              )}
               <ProductSubmissionSummary product={selectedHistory.product} />
             </>
           ) : null}

@@ -21,7 +21,7 @@ flowchart LR
 4. Orchestra runs **Generate → Review → Notify Product Content Studio**.
 5. Notify `POST`s draft + review to `/api/orchestra/callback` (shared secret).
 6. The UI shows the draft with Copy and Download `.txt`. Submit the form again
-   for a new version. Ready drafts are also saved in browser history (local only).
+   for a new version. History loads recent runs from Orchestra.
 
 ## Stack
 
@@ -31,8 +31,10 @@ flowchart LR
 - Vitest
 - Orchestra (webhook start, HTTP callback, Metadata API for status)
 
-No database and no login. Server run data lives in memory. Description history is
-stored in the browser (`localStorage`), not on the server.
+No database and no login. Server run data lives in memory for the current
+process. History keeps an HttpOnly cookie of recent `runId`s and hydrates each
+item from Orchestra (`/pipeline_runs/{id}/status` + `task_runs`). Listing all
+runs via Metadata API is not required (and may be disabled on some accounts).
 
 ## Local setup
 
@@ -121,6 +123,7 @@ Path stays `/api/orchestra/callback`.
 | `POST` | `/api/orchestra/callback` | Receive draft + review from Orchestra Notify |
 | `GET` | `/api/orchestra/runs/[runId]/wait` | Wait until draft is ready (or timeout ~110s) |
 | `GET` | `/api/orchestra/runs/[runId]` | Current run view (draft + status) |
+| `GET` | `/api/orchestra/history` | Recent runs hydrated from Orchestra |
 
 Secrets never go to the browser. The UI only talks to these routes.
 

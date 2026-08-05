@@ -1,4 +1,5 @@
 export const GENERATE_ENDPOINT = "/api/orchestra/generate";
+export const HISTORY_ENDPOINT = "/api/orchestra/history";
 
 export function runStatusEndpoint(runId: string): string {
   return `/api/orchestra/runs/${encodeURIComponent(runId)}`;
@@ -23,6 +24,9 @@ export const workflowMessages = {
   copied: "Copied",
   downloadDraft: "Download .txt",
   historyTitle: "History",
-  historyEmpty: "Generated descriptions will appear here on this browser.",
-  historySelected: "Showing a saved description from history.",
+  historyEmpty:
+    "Recent Orchestra runs will appear here after you generate a description.",
+  historySelected: "Showing a description loaded from Orchestra.",
+  historyError: "Could not load history from Orchestra.",
+  historyLoading: "Loading history from Orchestra...",
 } as const;
