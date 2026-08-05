@@ -1,5 +1,7 @@
 "use client";
 
+import { GeneratedDraft } from "@/components/generated-draft";
+import { ProductSubmissionSummary } from "@/components/product-submission-summary";
 import type { HistoryItem } from "@/types/api";
 import { workflowMessages } from "@/lib/messages";
 import { cn } from "@/lib/utils";
@@ -19,12 +21,14 @@ function formatCreatedAt(createdAt: string | null): string {
 export function DescriptionHistory({
   items,
   selectedRunId,
+  selectedItem,
   loading,
   error,
   onSelect,
 }: {
   items: HistoryItem[];
   selectedRunId: string | null;
+  selectedItem: HistoryItem | null;
   loading: boolean;
   error: string | null;
   onSelect: (item: HistoryItem) => void;
@@ -50,32 +54,53 @@ export function DescriptionHistory({
   }
 
   return (
-    <ul className="divide-y divide-border border-y border-border">
-      {items.map((item) => {
-        const selected = item.runId === selectedRunId;
-        return (
-          <li key={item.runId}>
-            <button
-              type="button"
-              onClick={() => onSelect(item)}
-              className={cn(
-                "flex w-full flex-col gap-1 px-1 py-3 text-left transition-colors hover:bg-muted/50",
-                selected && "bg-muted/60",
-              )}
-            >
-              <span className="text-sm font-medium">
-                {item.product.productName}
-              </span>
-              <span className="line-clamp-2 text-xs text-muted-foreground">
-                {item.draft ?? "Draft not ready yet"}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {formatCreatedAt(item.createdAt)}
-              </span>
-            </button>
-          </li>
-        );
-      })}
-    </ul>
+    <div className="space-y-4">
+      <ul className="divide-y divide-border border-y border-border">
+        {items.map((item) => {
+          const selected = item.runId === selectedRunId;
+          return (
+            <li key={item.runId}>
+              <button
+                type="button"
+                onClick={() => onSelect(item)}
+                className={cn(
+                  "flex w-full min-w-0 flex-col gap-0.5 px-1 py-3 text-left transition-colors hover:bg-muted/50",
+                  selected && "bg-muted/60",
+                )}
+              >
+                <span className="truncate text-sm font-medium">
+                  {item.product.productName}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {formatCreatedAt(item.createdAt)}
+                  {item.draft ? "" : " · Draft pending"}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      {selectedItem ? (
+        <div className="space-y-3 border-t border-border pt-4">
+          <p className="text-xs text-muted-foreground">
+            {workflowMessages.historySelected}
+          </p>
+          {selectedItem.draft ? (
+            <GeneratedDraft
+              title={selectedItem.product.productName}
+              draft={selectedItem.draft}
+              review={selectedItem.review}
+              productName={selectedItem.product.productName}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Draft not ready yet for this run.
+            </p>
+          )}
+          <ProductSubmissionSummary product={selectedItem.product} />
+        </div>
+      ) : null}
+    </div>
   );
 }

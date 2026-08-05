@@ -99,8 +99,7 @@ export function ProductContentWorkflow() {
       currentDraft &&
       previousDraft !== currentDraft &&
       trackingPhase &&
-      isReadyPhase(trackingPhase) &&
-      !selectedHistory,
+      isReadyPhase(trackingPhase),
   );
 
   async function loadHistory() {
@@ -325,7 +324,6 @@ export function ProductContentWorkflow() {
   }
 
   const run = submission.status === "tracking" ? submission.run : null;
-  const showingHistory = selectedHistory !== null;
 
   function readyDraftSection(draft: string, review: RunView["review"]) {
     if (showVersionCompare && previousDraft) {
@@ -379,7 +377,8 @@ export function ProductContentWorkflow() {
           </h2>
           <DescriptionHistory
             items={history}
-            selectedRunId={selectedHistory?.runId ?? run?.runId ?? null}
+            selectedRunId={selectedHistory?.runId ?? null}
+            selectedItem={selectedHistory}
             loading={historyLoading}
             error={historyError}
             onSelect={handleSelectHistory}
@@ -404,46 +403,13 @@ export function ProductContentWorkflow() {
         ) : null}
 
         <div aria-live="polite" className="space-y-4">
-          {showingHistory && selectedHistory ? (
-            <>
-              <Alert>
-                <CircleCheck />
-                <AlertTitle>Orchestra run</AlertTitle>
-                <AlertDescription>
-                  {workflowMessages.historySelected}
-                </AlertDescription>
-              </Alert>
-              {selectedHistory.draft ? (
-                <GeneratedDraft
-                  draft={selectedHistory.draft}
-                  review={selectedHistory.review}
-                  productName={selectedHistory.product.productName}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Draft not ready yet for this run.
-                </p>
-              )}
-              <ProductSubmissionSummary product={selectedHistory.product} />
-            </>
-          ) : null}
-
-          {!showingHistory && run?.phase === "generating" ? (
+          {run?.phase === "generating" ? (
             <>
               <Alert>
                 <Loader2 className="animate-spin" />
                 <AlertTitle>Generating</AlertTitle>
                 <AlertDescription>{workflowMessages.generating}</AlertDescription>
               </Alert>
-              {previousDraft ? (
-                <GeneratedDraft
-                  title="Previous draft"
-                  draft={previousDraft}
-                  review={null}
-                  productName={run.product.productName}
-                  showExport={false}
-                />
-              ) : null}
               {run.draft ? (
                 <GeneratedDraft
                   draft={run.draft}
@@ -465,7 +431,7 @@ export function ProductContentWorkflow() {
             </>
           ) : null}
 
-          {!showingHistory && run && isReadyPhase(run.phase) ? (
+          {run && isReadyPhase(run.phase) ? (
             <>
               <Alert>
                 <CircleCheck />
@@ -478,7 +444,7 @@ export function ProductContentWorkflow() {
             </>
           ) : null}
 
-          {!showingHistory && run?.phase === "rejected" ? (
+          {run?.phase === "rejected" ? (
             <>
               <Alert variant="destructive">
                 <XCircle />
@@ -489,7 +455,7 @@ export function ProductContentWorkflow() {
             </>
           ) : null}
 
-          {!showingHistory && run?.phase === "failed" ? (
+          {run?.phase === "failed" ? (
             <Alert variant="destructive">
               <TriangleAlert />
               <AlertTitle>Generation failed</AlertTitle>
@@ -498,13 +464,9 @@ export function ProductContentWorkflow() {
           ) : null}
         </div>
 
-        {!showingHistory && submission.status === "idle" ? (
-          <EmptyWorkflowState />
-        ) : null}
+        {submission.status === "idle" && !run ? <EmptyWorkflowState /> : null}
 
-        {!showingHistory && run ? (
-          <ProductSubmissionSummary product={run.product} />
-        ) : null}
+        {run ? <ProductSubmissionSummary product={run.product} /> : null}
       </section>
     </div>
   );
