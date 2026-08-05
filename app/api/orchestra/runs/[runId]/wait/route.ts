@@ -1,11 +1,16 @@
 import { buildRunView } from "@/lib/orchestra/run-view";
 import { apiError, mapOrchestraFailure } from "@/lib/orchestra/errors";
-import { waitForCallback } from "@/lib/runs/store";
+import { hasCallbackResult, waitForCallback } from "@/lib/runs/store";
 import type { RunView } from "@/types/api";
 
 export const maxDuration = 120;
 
+const TICK_MS = 2_500;
 const MAX_WAIT_MS = 110_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export async function GET(
   _request: Request,
@@ -18,9 +23,26 @@ export async function GET(
     return Response.json(body, { status });
   }
 
+  const startedAt = Date.now();
+
   try {
-    await waitForCallback(runId, MAX_WAIT_MS);
-    const latest: RunView = await buildRunView(runId);
+    // Wake early if Orchestra Notify posts the callback (same instance).
+    void waitForCallback(runId, MAX_WAIT_MS);
+
+    let latest: RunView = await buildRunView(runId);
+
+    while (
+      latest.phase === "generating" &&
+      !hasCallbackResult(runId) &&
+      Date.now() - startedAt < MAX_WAIT_MS
+    ) {
+      await sleep(TICK_MS);
+      latest = await buildRunView(runId);
+    }
+
+    if (hasCallbackResult(runId)) {
+      latest = await buildRunView(runId);
+    }
 
     return Response.json(latest, {
       status: latest.phase === "generating" ? 202 : 200,
