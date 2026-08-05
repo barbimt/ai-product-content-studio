@@ -283,9 +283,9 @@ describe("ProductContentWorkflow", () => {
     ).toBeInTheDocument();
   });
 
-  it("hydrates a history item that was selected before its draft arrived", async () => {
+  it("shows loading while hydrating a history item draft", async () => {
     const user = userEvent.setup();
-    let historyDraft: string | null = null;
+    let resolveStatus: ((value: Response) => void) | null = null;
 
     vi.mocked(globalThis.fetch).mockImplementation(async (input) => {
       const url = String(input);
@@ -301,11 +301,9 @@ describe("ProductContentWorkflow", () => {
                   features: "MagSafe compatible",
                   tone: "Professional",
                 },
-                draft: historyDraft,
-                review: historyDraft
-                  ? { status: "passed", reason: "Good." }
-                  : null,
-                phase: historyDraft ? "approved" : "generating",
+                draft: null,
+                review: null,
+                phase: "generating",
                 createdAt: "2026-08-05T17:00:00.000Z",
               },
             ],
@@ -314,23 +312,9 @@ describe("ProductContentWorkflow", () => {
         );
       }
       if (url.includes("/api/orchestra/runs/run-old")) {
-        historyDraft = "QuietCharge pad draft text.";
-        return new Response(
-          JSON.stringify({
-            runId: "run-old",
-            phase: "approved",
-            product: {
-              productName: "QuietCharge Pad",
-              category: "Accessories",
-              features: "MagSafe compatible",
-              tone: "Professional",
-            },
-            draft: historyDraft,
-            review: { status: "passed", reason: "Good." },
-            approvalUrl: null,
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
+        return new Promise<Response>((resolve) => {
+          resolveStatus = resolve;
+        });
       }
       return new Response(JSON.stringify({ items: [] }), {
         status: 200,
@@ -345,8 +329,34 @@ describe("ProductContentWorkflow", () => {
     await user.click(historyButton);
 
     expect(
+      await screen.findByText(/loading this description from orchestra/i),
+    ).toBeInTheDocument();
+
+    resolveStatus?.(
+      new Response(
+        JSON.stringify({
+          runId: "run-old",
+          phase: "approved",
+          product: {
+            productName: "QuietCharge Pad",
+            category: "Accessories",
+            features: "MagSafe compatible",
+            tone: "Professional",
+          },
+          draft: "QuietCharge pad draft text.",
+          review: { status: "passed", reason: "Good." },
+          approvalUrl: null,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    expect(
       await screen.findByText("QuietCharge pad draft text."),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/loading this description from orchestra/i),
+    ).not.toBeInTheDocument();
   });
 
   it("renders a safe error message when the request fails", async () => {

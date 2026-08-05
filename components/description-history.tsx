@@ -1,5 +1,7 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
+
 import type { HistoryItem } from "@/types/api";
 import { workflowMessages } from "@/lib/messages";
 import { cn } from "@/lib/utils";
@@ -19,12 +21,14 @@ function formatCreatedAt(createdAt: string | null): string {
 export function DescriptionHistory({
   items,
   selectedRunId,
+  loadingRunId = null,
   loading,
   error,
   onSelect,
 }: {
   items: HistoryItem[];
   selectedRunId: string | null;
+  loadingRunId?: string | null;
   loading: boolean;
   error: string | null;
   onSelect: (item: HistoryItem) => void;
@@ -53,22 +57,37 @@ export function DescriptionHistory({
     <ul className="divide-y divide-border border-y border-border">
       {items.map((item) => {
         const selected = item.runId === selectedRunId;
+        const rowLoading = item.runId === loadingRunId;
         return (
           <li key={item.runId}>
             <button
               type="button"
               onClick={() => onSelect(item)}
+              disabled={Boolean(loadingRunId) && !rowLoading}
+              aria-busy={rowLoading || undefined}
               className={cn(
-                "flex w-full min-w-0 cursor-pointer flex-col gap-0.5 px-1 py-3 text-left transition-colors hover:bg-muted/50",
+                "flex w-full min-w-0 cursor-pointer flex-col gap-0.5 px-1 py-3 text-left transition-colors hover:bg-muted/50 disabled:cursor-wait disabled:opacity-60",
                 selected && "bg-muted/60",
               )}
             >
-              <span className="truncate text-sm font-medium">
-                {item.product.productName}
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-sm font-medium">
+                  {item.product.productName}
+                </span>
+                {rowLoading ? (
+                  <Loader2
+                    className="size-3.5 shrink-0 animate-spin text-muted-foreground"
+                    aria-hidden
+                  />
+                ) : null}
               </span>
               <span className="text-xs text-muted-foreground">
                 {formatCreatedAt(item.createdAt)}
-                {item.draft ? "" : " · Draft pending"}
+                {rowLoading
+                  ? " · Loading..."
+                  : item.draft
+                    ? ""
+                    : " · Draft pending"}
               </span>
             </button>
           </li>

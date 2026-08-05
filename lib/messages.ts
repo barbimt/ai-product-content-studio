@@ -27,6 +27,7 @@ export const workflowMessages = {
   historyEmpty:
     "Recent Orchestra runs will appear here after you generate a description.",
   historySelected: "Showing a run from History. Click it again to return to the latest result.",
+  historyDetailLoading: "Loading this description from Orchestra...",
   historyDraftPending: "Draft not ready yet for this run. It will appear here when Orchestra finishes.",
   historyError: "Could not load history from Orchestra.",
   historyLoading: "Loading history from Orchestra...",

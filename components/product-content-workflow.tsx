@@ -83,6 +83,9 @@ export function ProductContentWorkflow() {
   const [selectedHistory, setSelectedHistory] = useState<HistoryItem | null>(
     null,
   );
+  const [historyDetailLoadingRunId, setHistoryDetailLoadingRunId] = useState<
+    string | null
+  >(null);
   const [formDefaults, setFormDefaults] = useState<
     ProductDescriptionInput | undefined
   >(undefined);
@@ -277,6 +280,7 @@ export function ProductContentWorkflow() {
     if (submission.status === "submitting") return;
 
     setSelectedHistory(null);
+    setHistoryDetailLoadingRunId(null);
 
     if (submission.status === "tracking" && submission.run.draft) {
       setPreviousDraft(submission.run.draft);
@@ -345,14 +349,19 @@ export function ProductContentWorkflow() {
 
   async function handleSelectHistory(item: HistoryItem) {
     // Clicking the selected row again returns to the latest live result.
-    if (selectedHistory?.runId === item.runId) {
+    if (
+      selectedHistory?.runId === item.runId &&
+      historyDetailLoadingRunId !== item.runId
+    ) {
       setSelectedHistory(null);
+      setHistoryDetailLoadingRunId(null);
       return;
     }
 
     // Prefer the live tracking view for the active run (avoids a stale snapshot).
     if (submission.status === "tracking" && submission.runId === item.runId) {
       setSelectedHistory(null);
+      setHistoryDetailLoadingRunId(null);
       setFormDefaults(submission.run.product);
       setFormKey((value) => value + 1);
       if (!submission.run.draft) {
@@ -362,17 +371,16 @@ export function ProductContentWorkflow() {
     }
 
     setSelectedHistory(item);
+    setHistoryDetailLoadingRunId(item.runId);
     setFormDefaults(item.product);
     setFormKey((value) => value + 1);
-
-    if (item.draft) return;
 
     try {
       const response = await fetch(runStatusEndpoint(item.runId), {
         cache: "no-store",
       });
       const body: RunStatusResponseBody = await response.json();
-      if (!response.ok || "error" in body || !body.draft) return;
+      if (!response.ok || "error" in body) return;
 
       const hydrated: HistoryItem = {
         runId: body.runId,
@@ -390,7 +398,11 @@ export function ProductContentWorkflow() {
         items.map((entry) => (entry.runId === item.runId ? hydrated : entry)),
       );
     } catch {
-      // Keep the pending message; history refresh may fill it later.
+      // Keep the pending/cached draft; history refresh may fill it later.
+    } finally {
+      setHistoryDetailLoadingRunId((current) =>
+        current === item.runId ? null : current,
+      );
     }
   }
 
@@ -450,6 +462,7 @@ export function ProductContentWorkflow() {
           <DescriptionHistory
             items={history}
             selectedRunId={selectedHistory?.runId ?? null}
+            loadingRunId={historyDetailLoadingRunId}
             loading={historyLoading}
             error={historyError}
             onSelect={handleSelectHistory}
@@ -479,7 +492,15 @@ export function ProductContentWorkflow() {
               <p className="text-xs text-muted-foreground">
                 {workflowMessages.historySelected}
               </p>
-              {selectedHistory.draft ? (
+              {historyDetailLoadingRunId === selectedHistory.runId ? (
+                <Alert>
+                  <Loader2 className="animate-spin" />
+                  <AlertTitle>Loading</AlertTitle>
+                  <AlertDescription>
+                    {workflowMessages.historyDetailLoading}
+                  </AlertDescription>
+                </Alert>
+              ) : selectedHistory.draft ? (
                 <GeneratedDraft
                   title={selectedHistory.product.productName}
                   draft={selectedHistory.draft}
