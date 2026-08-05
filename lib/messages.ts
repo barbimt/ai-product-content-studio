@@ -22,4 +22,7 @@ export const workflowMessages = {
   copyDraft: "Copy",
   copied: "Copied",
   downloadDraft: "Download .txt",
+  historyTitle: "History",
+  historyEmpty: "Generated descriptions will appear here on this browser.",
+  historySelected: "Showing a saved description from history.",
 } as const;

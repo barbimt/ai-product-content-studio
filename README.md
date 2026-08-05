@@ -21,7 +21,7 @@ flowchart LR
 4. Orchestra runs **Generate → Review → Notify Product Content Studio**.
 5. Notify `POST`s draft + review to `/api/orchestra/callback` (shared secret).
 6. The UI shows the draft with Copy and Download `.txt`. Submit the form again
-   for a new version.
+   for a new version. Ready drafts are also saved in browser history (local only).
 
 ## Stack
 
@@ -31,7 +31,8 @@ flowchart LR
 - Vitest
 - Orchestra (webhook start, HTTP callback, Metadata API for status)
 
-No database and no login. Run data lives in memory on the server process.
+No database and no login. Server run data lives in memory. Description history is
+stored in the browser (`localStorage`), not on the server.
 
 ## Local setup
 

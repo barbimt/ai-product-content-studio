@@ -16,11 +16,13 @@ import {
 type ProductDescriptionFormProps = {
   onSubmit: (values: ProductDescriptionInput) => void;
   isSubmitting: boolean;
+  defaultValues?: ProductDescriptionInput;
 };
 
 export function ProductDescriptionForm({
   onSubmit,
   isSubmitting,
+  defaultValues,
 }: ProductDescriptionFormProps) {
   const {
     register,
@@ -29,7 +31,7 @@ export function ProductDescriptionForm({
     formState: { errors },
   } = useForm<ProductDescriptionInput>({
     resolver: zodResolver(productDescriptionSchema),
-    defaultValues: {
+    defaultValues: defaultValues ?? {
       productName: "",
       category: "",
       features: "",

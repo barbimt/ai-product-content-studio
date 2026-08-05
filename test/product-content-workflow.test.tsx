@@ -71,7 +71,9 @@ describe("ProductContentWorkflow", () => {
     expect(
       await screen.findByText(/description ready/i),
     ).toBeInTheDocument();
-    expect(screen.getByText("A clear product description.")).toBeInTheDocument();
+    expect(
+      screen.getAllByText("A clear product description.").length,
+    ).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /^copy$/i })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /download \.txt/i }),
@@ -171,7 +173,9 @@ describe("ProductContentWorkflow", () => {
     await waitFor(() => {
       expect(screen.getByText(/description ready/i)).toBeInTheDocument();
     });
-    expect(screen.getByText("Ready draft from status.")).toBeInTheDocument();
+    expect(
+      screen.getAllByText("Ready draft from status.").length,
+    ).toBeGreaterThan(0);
   });
 
   it("renders a safe error message when the request fails", async () => {

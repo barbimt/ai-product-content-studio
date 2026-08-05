@@ -12,12 +12,18 @@ import { ProductSubmissionSummary } from "./product-submission-summary";
 import { GeneratedDraft } from "./generated-draft";
 import { DraftExportActions } from "./draft-export-actions";
 import { DraftVersionCompare } from "./draft-version-compare";
+import { DescriptionHistory } from "./description-history";
 import {
   GENERATE_ENDPOINT,
   runStatusEndpoint,
   runWaitEndpoint,
   workflowMessages,
 } from "@/lib/messages";
+import {
+  readHistory,
+  saveHistoryItem,
+  type HistoryItem,
+} from "@/lib/history/browser-history";
 import type { ProductDescriptionInput } from "@/lib/validation/product-description";
 import type {
   GenerateResponseBody,
@@ -46,7 +52,6 @@ const phaseRank: Record<RunView["phase"], number> = {
 };
 
 function mergeRunView(previous: RunView, next: RunView): RunView {
-  // A late /wait timeout must not overwrite a newer Check status result.
   const phase =
     phaseRank[next.phase] >= phaseRank[previous.phase]
       ? next.phase
@@ -74,6 +79,14 @@ export function ProductContentWorkflow() {
     status: "idle",
   });
   const [previousDraft, setPreviousDraft] = useState<string | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>(() => readHistory());
+  const [selectedHistory, setSelectedHistory] = useState<HistoryItem | null>(
+    null,
+  );
+  const [formDefaults, setFormDefaults] = useState<
+    ProductDescriptionInput | undefined
+  >(undefined);
+  const [formKey, setFormKey] = useState(0);
 
   const trackingRunId =
     submission.status === "tracking" ? submission.runId : null;
@@ -86,8 +99,23 @@ export function ProductContentWorkflow() {
       currentDraft &&
       previousDraft !== currentDraft &&
       trackingPhase &&
-      isReadyPhase(trackingPhase),
+      isReadyPhase(trackingPhase) &&
+      !selectedHistory,
   );
+
+  function persistReadyRun(run: RunView) {
+    if (!run.draft) return;
+    if (!isReadyPhase(run.phase) && run.phase !== "rejected") return;
+    setHistory(
+      saveHistoryItem({
+        runId: run.runId,
+        product: run.product,
+        draft: run.draft,
+        review: run.review,
+        savedAt: Date.now(),
+      }),
+    );
+  }
 
   async function applyStatus(runId: string): Promise<void> {
     const response = await fetch(runStatusEndpoint(runId), {
@@ -106,15 +134,18 @@ export function ProductContentWorkflow() {
       return;
     }
 
+    let nextRun: RunView | null = null;
     setSubmission((prev) => {
       if (prev.status !== "tracking" || prev.runId !== body.runId) return prev;
+      nextRun = mergeRunView(prev.run, body);
       return {
         ...prev,
         statusError: null,
         refreshing: false,
-        run: mergeRunView(prev.run, body),
+        run: nextRun,
       };
     });
+    if (nextRun) persistReadyRun(nextRun);
   }
 
   useEffect(() => {
@@ -140,16 +171,19 @@ export function ProductContentWorkflow() {
           return;
         }
 
+        let nextRun: RunView | null = null;
         setSubmission((prev) => {
           if (prev.status !== "tracking" || prev.runId !== body.runId) {
             return prev;
           }
+          nextRun = mergeRunView(prev.run, body);
           return {
             ...prev,
             statusError: null,
-            run: mergeRunView(prev.run, body),
+            run: nextRun,
           };
         });
+        if (nextRun) persistReadyRun(nextRun);
 
         if (body.phase === "generating") {
           await applyStatus(trackingRunId!);
@@ -176,7 +210,8 @@ export function ProductContentWorkflow() {
   async function handleSubmit(values: ProductDescriptionInput) {
     if (submission.status === "submitting") return;
 
-    // Keep the last draft so a new Generate description can show Previous vs New.
+    setSelectedHistory(null);
+
     if (submission.status === "tracking" && submission.run.draft) {
       setPreviousDraft(submission.run.draft);
     } else {
@@ -240,7 +275,14 @@ export function ProductContentWorkflow() {
     }
   }
 
+  function handleSelectHistory(item: HistoryItem) {
+    setSelectedHistory(item);
+    setFormDefaults(item.product);
+    setFormKey((value) => value + 1);
+  }
+
   const run = submission.status === "tracking" ? submission.run : null;
+  const showingHistory = selectedHistory !== null;
 
   function readyDraftSection(draft: string, review: RunView["review"]) {
     if (showVersionCompare && previousDraft) {
@@ -275,15 +317,30 @@ export function ProductContentWorkflow() {
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-12">
-      <section aria-labelledby="form-heading" className="space-y-4">
-        <h2 id="form-heading" className="text-sm font-semibold">
-          Product details
-        </h2>
-        <ProductDescriptionForm
-          onSubmit={handleSubmit}
-          isSubmitting={submission.status === "submitting"}
-        />
-      </section>
+      <div className="space-y-8">
+        <section aria-labelledby="form-heading" className="space-y-4">
+          <h2 id="form-heading" className="text-sm font-semibold">
+            Product details
+          </h2>
+          <ProductDescriptionForm
+            key={formKey}
+            onSubmit={handleSubmit}
+            isSubmitting={submission.status === "submitting"}
+            defaultValues={formDefaults}
+          />
+        </section>
+
+        <section aria-labelledby="history-heading" className="space-y-3">
+          <h2 id="history-heading" className="text-sm font-semibold">
+            {workflowMessages.historyTitle}
+          </h2>
+          <DescriptionHistory
+            items={history}
+            selectedRunId={selectedHistory?.runId ?? run?.runId ?? null}
+            onSelect={handleSelectHistory}
+          />
+        </section>
+      </div>
 
       <section aria-labelledby="result-heading" className="space-y-4">
         <h2 id="result-heading" className="text-sm font-semibold">
@@ -302,7 +359,25 @@ export function ProductContentWorkflow() {
         ) : null}
 
         <div aria-live="polite" className="space-y-4">
-          {run?.phase === "generating" ? (
+          {showingHistory && selectedHistory ? (
+            <>
+              <Alert>
+                <CircleCheck />
+                <AlertTitle>Saved description</AlertTitle>
+                <AlertDescription>
+                  {workflowMessages.historySelected}
+                </AlertDescription>
+              </Alert>
+              <GeneratedDraft
+                draft={selectedHistory.draft}
+                review={selectedHistory.review}
+                productName={selectedHistory.product.productName}
+              />
+              <ProductSubmissionSummary product={selectedHistory.product} />
+            </>
+          ) : null}
+
+          {!showingHistory && run?.phase === "generating" ? (
             <>
               <Alert>
                 <Loader2 className="animate-spin" />
@@ -339,7 +414,7 @@ export function ProductContentWorkflow() {
             </>
           ) : null}
 
-          {run && isReadyPhase(run.phase) ? (
+          {!showingHistory && run && isReadyPhase(run.phase) ? (
             <>
               <Alert>
                 <CircleCheck />
@@ -352,7 +427,7 @@ export function ProductContentWorkflow() {
             </>
           ) : null}
 
-          {run?.phase === "rejected" ? (
+          {!showingHistory && run?.phase === "rejected" ? (
             <>
               <Alert variant="destructive">
                 <XCircle />
@@ -363,7 +438,7 @@ export function ProductContentWorkflow() {
             </>
           ) : null}
 
-          {run?.phase === "failed" ? (
+          {!showingHistory && run?.phase === "failed" ? (
             <Alert variant="destructive">
               <TriangleAlert />
               <AlertTitle>Generation failed</AlertTitle>
@@ -372,9 +447,13 @@ export function ProductContentWorkflow() {
           ) : null}
         </div>
 
-        {submission.status === "idle" ? <EmptyWorkflowState /> : null}
+        {!showingHistory && submission.status === "idle" ? (
+          <EmptyWorkflowState />
+        ) : null}
 
-        {run ? <ProductSubmissionSummary product={run.product} /> : null}
+        {!showingHistory && run ? (
+          <ProductSubmissionSummary product={run.product} />
+        ) : null}
       </section>
     </div>
   );
