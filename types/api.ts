@@ -18,7 +18,6 @@ export type RunView = {
   product: ProductDescriptionInput;
   draft: string | null;
   review: ReviewOutcome | null;
-  approvalUrl: string | null;
 };
 
 export type GeneratePipelineResponse = {

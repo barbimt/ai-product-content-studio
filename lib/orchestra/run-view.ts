@@ -1,4 +1,3 @@
-import { pipelineRunApprovalUrl } from "@/lib/config/server";
 import { getOrchestraRunSnapshot } from "@/lib/orchestra/client";
 import {
   deriveRunPhase,
@@ -49,7 +48,5 @@ export async function buildRunView(runId: string): Promise<RunView> {
     },
     draft,
     review,
-    approvalUrl:
-      phase === "awaiting_approval" ? pipelineRunApprovalUrl(runId) : null,
   };
 }

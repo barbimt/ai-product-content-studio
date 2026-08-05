@@ -1,20 +1,12 @@
 # Product Content Studio
 
-Next.js app that uses an Orchestra pipeline to generate ecommerce product
-descriptions. You can copy or download the draft, submit again for a new
-version, and reopen recent runs from history.
+Next.js app that starts an Orchestra pipeline to draft ecommerce product
+descriptions. Copy or download the result, generate another version, or reopen
+recent runs from History.
 
 **Live demo:** [ai-product-content-studio-henna.vercel.app](https://ai-product-content-studio-henna.vercel.app/)
 
-## What you can do in the UI
-
-- Fill product name, category, features, and tone
-- Wait for Orchestra to generate and review the description
-- Copy or download the draft as `.txt`
-- Submit the form again for another version (optional previous vs new compare)
-- Open **History** to pick a past run; the full draft opens in the right panel
-
-## How it works
+## Flow
 
 ```mermaid
 flowchart LR
@@ -23,17 +15,16 @@ flowchart LR
     C --> D[Generate]
     D --> E[Review]
     E --> F[Notify callback]
-    F --> G[UI shows draft]
-    G --> H[History from Orchestra]
+    F --> G[UI draft + History]
 ```
 
-1. The form posts product details to the app.
+1. The form posts product name, category, features, and tone.
 2. The server starts the Orchestra pipeline and returns a `runId`.
-3. The browser waits once on `/api/orchestra/runs/{runId}/wait`.
+3. The browser waits on `/api/orchestra/runs/{runId}/wait`.
 4. Orchestra runs **Generate → Review → Notify Product Content Studio**.
 5. Notify `POST`s the draft to `/api/orchestra/callback` (shared secret).
-6. The UI shows the description. History stores recent `runId`s (HttpOnly cookie)
-   and loads each run from Orchestra status + task runs.
+6. The UI shows the description. History keeps recent `runId`s in an HttpOnly
+   cookie and hydrates each run from Orchestra.
 
 ## Stack
 
@@ -60,19 +51,14 @@ Open [http://localhost:3000](http://localhost:3000).
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `ORCHESTRA_WEBHOOK_URL` | yes | Pipeline start URL from Orchestra |
-| `ORCHESTRA_API_TOKEN` | yes | Bearer token for Orchestra run status / history |
+| `ORCHESTRA_API_TOKEN` | yes | Bearer token for run status / history |
 | `ORCHESTRA_CALLBACK_SECRET` | yes | Shared secret for the Notify HTTP header |
 | `ORCHESTRA_REQUEST_TIMEOUT_MS` | no | Outbound timeout (default `15000`) |
 | `ORCHESTRA_API_BASE_URL` | no | Default: `https://app.getorchestra.io/api/engine/public` |
-| `ORCHESTRA_UI_BASE_URL` | no | Default: `https://app.getorchestra.io` |
 
-## Orchestra pipeline
+## Orchestra Notify task
 
-Expected shape (no human approval step required for this app):
-
-`Generate → Review → Notify Product Content Studio`
-
-### Notify HTTP task
+Pipeline shape for this app: `Generate → Review → Notify Product Content Studio`.
 
 | Field | Value |
 |-------|--------|
@@ -102,8 +88,7 @@ Expected shape (no human approval step required for this app):
 }
 ```
 
-Local `npm run dev` is not public. Deploy to Vercel (or use a tunnel) so Notify
-can reach the callback.
+`npm run dev` is not public — deploy (or use a tunnel) so Notify can reach the callback.
 
 ## Deploy on Vercel
 
@@ -112,9 +97,8 @@ npx vercel login
 npx vercel --prod
 ```
 
-Add the env vars for **Production** and **Preview**, then redeploy.
-
-Point the Orchestra HTTP connection Base URL at your deployment, for example:
+Add the env vars for **Production** and **Preview**, then redeploy. Point the
+Orchestra HTTP connection Base URL at your deployment, for example:
 
 `https://ai-product-content-studio-henna.vercel.app`
 
@@ -122,10 +106,8 @@ Point the Orchestra HTTP connection Base URL at your deployment, for example:
 
 - `/wait` uses `maxDuration = 120`. On Hobby the cap may be lower (~60s). If the
   UI stays on “Generating”, use **Check status**.
-- In-memory run cache is per serverless instance. Prefer one production URL for demos.
-- History uses an HttpOnly cookie of recent `runId`s and hydrates drafts from
-  Orchestra. Workspace-wide `list_pipeline_runs` is not required (it may be
-  disabled on some accounts).
+- In-memory run cache is per serverless instance — prefer one production URL for demos.
+- Workspace-wide `list_pipeline_runs` is not required (it may be disabled).
 
 ## API routes
 

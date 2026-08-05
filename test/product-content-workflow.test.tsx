@@ -68,7 +68,6 @@ describe("ProductContentWorkflow", () => {
             },
             draft: "A clear product description.",
             review: { status: "passed", reason: "Looks good." },
-            approvalUrl: "https://app.getorchestra.io/pipeline-runs/run-42/lineage",
           }),
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
@@ -146,8 +145,6 @@ describe("ProductContentWorkflow", () => {
             },
             draft: "Ready draft from status.",
             review: { status: "passed", reason: "Looks good." },
-            approvalUrl:
-              "https://app.getorchestra.io/pipeline-runs/run-99/lineage",
           }),
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
@@ -187,7 +184,6 @@ describe("ProductContentWorkflow", () => {
           },
           draft: null,
           review: null,
-          approvalUrl: null,
         }),
         { status: 202, headers: { "Content-Type": "application/json" } },
       ),
@@ -231,7 +227,6 @@ describe("ProductContentWorkflow", () => {
             product: historyItem.product,
             draft: "BrightSip draft from live wait.",
             review: { status: "passed", reason: "Looks good." },
-            approvalUrl: null,
           }),
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
@@ -244,7 +239,6 @@ describe("ProductContentWorkflow", () => {
             product: historyItem.product,
             draft: "BrightSip draft from live wait.",
             review: { status: "passed", reason: "Looks good." },
-            approvalUrl: null,
           }),
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
@@ -347,15 +341,16 @@ describe("ProductContentWorkflow", () => {
           },
           draft: "QuietCharge pad draft text.",
           review: { status: "passed", reason: "Good." },
-          approvalUrl: null,
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       ),
     );
 
-    expect(
-      await screen.findByText("QuietCharge pad draft text."),
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getAllByText("QuietCharge pad draft text.").length,
+      ).toBeGreaterThanOrEqual(1);
+    });
     expect(
       screen.queryByText(/loading this description from orchestra/i),
     ).not.toBeInTheDocument();

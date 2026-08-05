@@ -60,9 +60,6 @@ function mergeRunView(previous: RunView, next: RunView): RunView {
     phase,
     draft: next.draft ?? previous.draft,
     review: next.review ?? previous.review,
-    approvalUrl:
-      next.approvalUrl ??
-      (phase === "awaiting_approval" ? previous.approvalUrl : null),
     product:
       next.product.productName.length > 0 ? next.product : previous.product,
   };
@@ -316,7 +313,6 @@ export function ProductContentWorkflow() {
           product: values,
           draft: null,
           review: null,
-          approvalUrl: null,
         },
       });
       void loadHistory();
