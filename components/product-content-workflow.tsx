@@ -59,9 +59,29 @@ function toWorkflowPhase(state: SubmissionState): WorkflowPhase {
   }
 }
 
+const phaseRank: Record<RunView["phase"], number> = {
+  generating: 0,
+  awaiting_approval: 1,
+  approved: 2,
+  rejected: 2,
+  failed: 2,
+};
+
 function mergeRunView(previous: RunView, next: RunView): RunView {
+  // A late /wait timeout must not overwrite a newer Check status result.
+  const phase =
+    phaseRank[next.phase] >= phaseRank[previous.phase]
+      ? next.phase
+      : previous.phase;
+
   return {
     ...next,
+    phase,
+    draft: next.draft ?? previous.draft,
+    review: next.review ?? previous.review,
+    approvalUrl:
+      next.approvalUrl ??
+      (phase === "awaiting_approval" ? previous.approvalUrl : null),
     product:
       next.product.productName.length > 0 ? next.product : previous.product,
   };
@@ -110,15 +130,16 @@ export function ProductContentWorkflow() {
   useEffect(() => {
     if (!trackingRunId || trackingPhase !== "generating") return;
 
-    let cancelled = false;
+    const controller = new AbortController();
 
     async function waitForDraft() {
       try {
         const response = await fetch(runWaitEndpoint(trackingRunId!), {
           cache: "no-store",
+          signal: controller.signal,
         });
         const body: RunStatusResponseBody = await response.json();
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
 
         if ("error" in body) {
           setSubmission((prev) =>
@@ -139,8 +160,16 @@ export function ProductContentWorkflow() {
             run: mergeRunView(prev.run, body),
           };
         });
-      } catch {
-        if (cancelled) return;
+
+        // Hobby /wait may time out while Orchestra is still running — refresh once.
+        if (body.phase === "generating") {
+          await applyStatus(trackingRunId!);
+        }
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
         setSubmission((prev) =>
           prev.status === "tracking" && prev.runId === trackingRunId
             ? { ...prev, statusError: workflowMessages.statusError }
@@ -151,7 +180,7 @@ export function ProductContentWorkflow() {
 
     void waitForDraft();
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [trackingRunId, trackingPhase]);
 

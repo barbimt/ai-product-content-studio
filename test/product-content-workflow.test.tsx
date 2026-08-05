@@ -93,6 +93,88 @@ describe("ProductContentWorkflow", () => {
     }
   });
 
+  it("does not let a late wait timeout overwrite a ready draft", async () => {
+    const user = userEvent.setup();
+    let resolveWait: ((value: Response) => void) | null = null;
+
+    vi.mocked(globalThis.fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/wait")) {
+        // Intentionally ignore abort so we can assert merge guards against a late timeout body.
+        return new Promise<Response>((resolve) => {
+          resolveWait = resolve;
+        });
+      }
+      if (url.includes("/api/orchestra/runs/") && !url.includes("/wait")) {
+        return new Response(
+          JSON.stringify({
+            runId: "run-99",
+            phase: "awaiting_approval",
+            product: {
+              productName: "TrailFlex Running Shoes",
+              category: "Sports footwear",
+              features: "Lightweight mesh upper, cushioned sole and rubber grip",
+              tone: "Friendly",
+            },
+            draft: "Ready draft from status.",
+            review: { status: "passed", reason: "Looks good." },
+            approvalUrl:
+              "https://app.getorchestra.io/pipeline-runs/run-99/lineage",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          runId: "run-99",
+          status: "triggered",
+          message: "The product content workflow has started.",
+        }),
+        { status: 202, headers: { "Content-Type": "application/json" } },
+      );
+    });
+
+    render(<ProductContentWorkflow />);
+    await fillValidForm(user);
+    await user.click(screen.getByRole("button", { name: /generate description/i }));
+
+    expect(
+      await screen.findByRole("button", { name: /check status/i }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /check status/i }));
+
+    expect(
+      await screen.findByText(/draft ready — approve in orchestra/i),
+    ).toBeInTheDocument();
+
+    resolveWait?.(
+      new Response(
+        JSON.stringify({
+          runId: "run-99",
+          phase: "generating",
+          product: {
+            productName: "",
+            category: "",
+            features: "",
+            tone: "Professional",
+          },
+          draft: null,
+          review: null,
+          approvalUrl: null,
+        }),
+        { status: 202, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/draft ready — approve in orchestra/i),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByText("Ready draft from status.")).toBeInTheDocument();
+  });
+
   it("renders a safe error message when the request fails", async () => {
     const user = userEvent.setup();
     vi.mocked(globalThis.fetch).mockResolvedValue(
