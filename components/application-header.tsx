@@ -1,7 +1,7 @@
 export function ApplicationHeader() {
   return (
     <header className="border-b border-border">
-      <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-6 py-3">
+      <div className="mx-auto flex w-full max-w-5xl items-center gap-4 px-6 py-3">
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden
@@ -11,7 +11,6 @@ export function ApplicationHeader() {
             Product Content Studio
           </span>
         </div>
-        <span className="text-xs text-muted-foreground">Powered by Orchestra</span>
       </div>
     </header>
   );

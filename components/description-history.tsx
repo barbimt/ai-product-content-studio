@@ -66,7 +66,7 @@ export function DescriptionHistory({
               disabled={Boolean(loadingRunId) && !rowLoading}
               aria-busy={rowLoading || undefined}
               className={cn(
-                "flex w-full min-w-0 !cursor-pointer flex-col gap-1 px-1 py-3 text-left transition-colors hover:bg-muted/50 disabled:!cursor-wait disabled:opacity-60",
+                "flex w-full min-w-0 cursor-pointer! flex-col gap-1 px-1 py-3 text-left transition-colors hover:bg-muted/50 disabled:cursor-wait! disabled:opacity-60",
                 selected && "bg-muted/60",
               )}
             >
